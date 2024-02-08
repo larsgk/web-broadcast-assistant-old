@@ -3,7 +3,7 @@
 import { cobsEncode, cobsDecode } from './cobs.js';
 
 /**
-* This module contains enums and factories related to messages
+* This module contains enums and functions related to messages
 *
 * message format:
 *      {

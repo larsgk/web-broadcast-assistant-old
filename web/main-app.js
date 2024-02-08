@@ -3,7 +3,6 @@ export class MainApp extends HTMLElement {
 
     constructor() {
         super();
-
     }
 
     connectedCallback() {
