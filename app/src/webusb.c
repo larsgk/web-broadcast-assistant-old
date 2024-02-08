@@ -28,7 +28,7 @@ LOG_MODULE_REGISTER(webusb, LOG_LEVEL_ERR);
 #if defined(CONFIG_USB_DC_HAS_HS_SUPPORT)
 #define WEBUSB_BULK_EP_MPS		512
 #else
-#define WEBUSB_BULK_EP_MPS		COBS_ENCODE_DST_BUF_LEN_MAX(CONFIG_WEBUSB_APPLICATION_TX_MAX_PAYLOAD_SIZE)
+#define WEBUSB_BULK_EP_MPS		64
 #endif
 
 /* Number of interfaces */
@@ -44,7 +44,7 @@ LOG_MODULE_REGISTER(webusb, LOG_LEVEL_ERR);
 
 void (*webusb_cmd_handler)(uint8_t *command_ptr, uint16_t command_length);
 
-uint8_t rx_buf[WEBUSB_BULK_EP_MPS];
+uint8_t rx_buf[COBS_ENCODE_DST_BUF_LEN_MAX(CONFIG_WEBUSB_APPLICATION_TX_MAX_PAYLOAD_SIZE)];
 
 #define INITIALIZER_IF(num_ep, iface_class)				\
 	{								\
