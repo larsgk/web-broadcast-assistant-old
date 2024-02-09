@@ -1,5 +1,7 @@
 // @ts-check
 
+import { MessageType, MessageSubType } from '../lib/message.js';
+
 /**
 * WebUSB Device Service
 *
@@ -63,5 +65,9 @@ export const WebUSBDeviceService = new class extends EventTarget {
 
 		//console.log('device opened', this.#device)
 		this.readLoop();
+	}
+
+	sendMessageAsEvent(message) {
+		this.dispatchEvent(new CustomEvent('message', { detail: { message }}));
 	}
 }
