@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<button id="connect">CONNECT</button>
+<script type="module" >
+	// @ts-check
+
+	import { cobsEncode, cobsDecode } from '../lib/cobs.js';
+	import { compareTypedArray, arrayToHex } from '../lib/helpers.js';
+	import { arrayToMsg, msgToArray, MessageType, MessageSubType } from '../lib/message.js';
+
+	import { WebUSBDeviceService } from './webusb-device-service.js';
+
+	const button = document.querySelector('#connect');
+
+	button?.addEventListener('click', WebUSBDeviceService.scan);
+
+	const sendMessage = () => {
+		const message = {
+			type: MessageType.CMD,
+			subType: MessageSubType.START_SOURCE_SCAN,
+			seqNo: 123,
+			payload: new Uint8Array([0x04, 0x44, 0x01, 0x02]) // TBD: Payload in concatenated LTV
+		}
+
+		console.log('message', message);
+
+		let arrayIn = msgToArray(message);
+		console.log('-> array', `length=${arrayIn.length}`, `data=[${arrayToHex(arrayIn)}]`);
+
+		let encoded = cobsEncode(arrayIn, true);
+		console.log('-> cobs encoded', `length=${encoded.length}`, `data=[${arrayToHex(encoded)}]`);
+
+		WebUSBDeviceService.sendData(encoded);
+
+		let decoded = cobsDecode(encoded, true);
+		console.log('-> cobs decoded', `length=${decoded.length}`, `data=[${arrayToHex(decoded)}]`);
+
+		console.log('arrayIn == decoded?', compareTypedArray(arrayIn, decoded));
+
+		let messageOut = arrayToMsg(decoded);
+		console.log('decoded message', messageOut);
+	}
+
+	WebUSBDeviceService.addEventListener('connected', evt => {
+		const { device } = evt.detail;
+		console.log('connected', device );
+
+		setInterval(sendMessage, 1000);
+	});
+
+</script>
