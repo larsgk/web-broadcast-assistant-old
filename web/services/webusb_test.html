@@ -13,13 +13,27 @@
 
 	button?.addEventListener('click', WebUSBDeviceService.scan);
 
+	const rawDataReceived = (evt) => {
+		const data = evt.detail;
+
+		let decoded = cobsDecode(data, true);
+		console.log('-> cobs decoded', `length=${decoded.length}`, `data=[${arrayToHex(decoded)}]`);
+
+		let messageOut = arrayToMsg(decoded);
+		console.log('decoded response', messageOut);
+	}
+
+	WebUSBDeviceService.addEventListener('raw-data-received', rawDataReceived);
+	let seqNo = 1;
 	const sendMessage = () => {
 		const message = {
 			type: MessageType.CMD,
 			subType: MessageSubType.DUMMY,
-			seqNo: 123,
+			seqNo: seqNo,
 			payload: new Uint8Array([0x04, 0x44, 0x01, 0x02]) // TBD: Payload in concatenated LTV
 		}
+		seqNo++;
+		if (seqNo > 0xFF) seqNo = 1;
 
 		console.log('message', message);
 
@@ -31,13 +45,14 @@
 
 		WebUSBDeviceService.sendData(encoded);
 
-		let decoded = cobsDecode(encoded, true);
-		console.log('-> cobs decoded', `length=${decoded.length}`, `data=[${arrayToHex(decoded)}]`);
+		// let decoded = cobsDecode(encoded, true);
+		// console.log('-> cobs decoded', `length=${decoded.length}`, `data=[${arrayToHex(decoded)}]`);
 
-		console.log('arrayIn == decoded?', compareTypedArray(arrayIn, decoded));
+		// console.log('arrayIn == decoded?', compareTypedArray(arrayIn, decoded));
 
-		let messageOut = arrayToMsg(decoded);
-		console.log('decoded message', messageOut);
+		// let messageOut = arrayToMsg(decoded);
+		// console.log('decoded message', messageOut);
+
 	}
 
 	WebUSBDeviceService.addEventListener('connected', evt => {

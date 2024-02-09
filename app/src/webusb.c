@@ -108,11 +108,20 @@ static void webusb_rx_work_handler(struct k_work *work_p);
 K_WORK_DEFINE(webusb_rx_work, webusb_rx_work_handler);
 static void webusb_tx_work_handler(struct k_work *work_p);
 K_WORK_DEFINE(webusb_tx_work, webusb_tx_work_handler);
-K_MSGQ_DEFINE(webusb_tx_msg_queue, sizeof(webusb_tx_msg_t), CONFIG_WEBUSB_TX_MSG_QUEUE_SIZE, 4);
+K_MSGQ_DEFINE(webusb_tx_msg_queue, sizeof(webusb_tx_msg_t), 20, 4);
 
 uint8_t cobs_decoded_stream[MAX_COBS_MESSAGE_SIZE];
 uint16_t cobs_decoded_length;
 uint8_t cobs_encoded_stream[MAX_COBS_MESSAGE_SIZE];
+
+
+void print_hex(const uint8_t *ptr, size_t len)
+{
+	while (len-- != 0) {
+		printk("%02x ", *ptr++);
+	}
+	printk("\n");
+}
 
 void webusb_init(void)
 {
@@ -136,6 +145,9 @@ int webusb_transmit(uint8_t *data, uint16_t size)
 	webusb_tx_msg_t tx_msg;
 	int ret;
 
+	LOG_DBG("Preparing to send data (len=%d)", size);
+	print_hex(data, size);
+
 	if (size > CONFIG_WEBUSB_APPLICATION_TX_MAX_PAYLOAD_SIZE) {
 		return -EINVAL;
 	}
@@ -143,12 +155,19 @@ int webusb_transmit(uint8_t *data, uint16_t size)
 	memcpy(tx_msg.data, data, size);
 	tx_msg.size = size;
 
+	LOG_DBG("Trying to put message on queue");
+
 	ret = k_msgq_put(&webusb_tx_msg_queue, &tx_msg, K_NO_WAIT);
-	if (ret < 0) {
+	if (ret != 0) {
+		LOG_ERR("Failed to put message on queue");
 		return ret;
 	}
 	ret = k_work_submit_to_queue(&webusb_workqueue, &webusb_tx_work);
-	return ret;
+	if (ret < 0) {
+		LOG_ERR("Failed to submit work qo workqueue");
+		return ret;
+	}
+	return 0;
 }
 
 static void webusb_rx_work_handler(struct k_work *work_p)
@@ -231,13 +250,6 @@ void webusb_register_command_handler(void (*cb)(uint8_t *command_ptr, uint16_t c
 	webusb_cmd_handler = cb;
 }
 
-void print_hex(const uint8_t *ptr, size_t len)
-{
-	while (len-- != 0) {
-		printk("%02x ", *ptr++);
-	}
-	printk("\n");
-}
 
 static void webusb_read_cb(uint8_t ep, int size, void *priv)
 {

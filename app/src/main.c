@@ -20,6 +20,26 @@
 
 LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 
+enum MessageType {
+	MESSAGE_TYPE_CMD = 1,
+	MESSAGE_TYPE_RES,
+	MESSAGE_TYPE_EVT,
+};
+
+enum MessageSubType {
+	/* CMD/RES (bit7 = 0) */
+	MESSAGE_SUBTYPE_START_SINK_SCAN		= 0x01,
+	MESSAGE_SUBTYPE_START_SOURCE_SCAN	= 0x02,
+
+	MESSAGE_SUBTYPE_DUMMY			= 0x7F,
+
+	/* EVT (bit7 = 1) */
+	MESSAGE_SUBTYPE_SINK_FOUND		= 0x81,
+	MESSAGE_SUBTYPE_SOURCE_FOUND		= 0x82,
+
+	MESSAGE_SUBTYPE_HEARTBEAT		= 0xFF,
+};
+
 
 static void heartbeat_timeout_handler(struct k_timer *dummy_p);
 K_TIMER_DEFINE(heartbeat_timer, heartbeat_timeout_handler, NULL);
@@ -43,6 +63,21 @@ void send_ok_response(void) {
 	}
 }
 
+void send_dummy_response(uint8_t seq_no) {
+	int ret;
+	// Assemble Dummy response and send (payload size = 0)
+	uint8_t buf[] = {
+		MESSAGE_TYPE_RES,
+		MESSAGE_SUBTYPE_DUMMY,
+		seq_no,
+		0,0
+	};
+	ret = webusb_transmit((uint8_t*)&buf, sizeof(buf));
+	if (ret != 0) {
+		LOG_ERR("FAILED TO SEND Dummy response (err=%d)", ret);
+	}
+}
+
 void send_error_response(void) {
 	// Assemble OK response and send
 	uint8_t payload[] = { 'E', 'R', 'R'};
@@ -56,6 +91,7 @@ void command_handler(uint8_t *command_ptr, uint16_t command_length)
 	// MISSING PARSING OF COMMANDS AND DEFINITIONS OF THOSE !!!!
 	uint8_t msg_type = command_ptr[0];
 	uint8_t msg_sub_type = command_ptr[1];
+	uint8_t msg_seq_no = command_ptr[2];
 	#define HEARTBEAT 1
 	#define ON 1
 
@@ -75,7 +111,7 @@ void command_handler(uint8_t *command_ptr, uint16_t command_length)
 
 		case DUMMY:
 			LOG_DBG("DUMMY CMD received... send response...");
-			send_ok_response();
+			send_dummy_response(msg_seq_no);
 			break;
 
 		default:

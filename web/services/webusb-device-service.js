@@ -11,6 +11,8 @@
 
 const deviceFilter = { 'vendorId': 0x2fe3, 'productId': 0x00a };
 
+const MAX_BYTES_READ = 4096;
+
 export const WebUSBDeviceService = new class extends EventTarget {
 	#device
 
@@ -33,8 +35,11 @@ export const WebUSBDeviceService = new class extends EventTarget {
 		const {
 			endpointNumber
 		} = this.#device.configuration.interfaces[0].alternate.endpoints[0]
-		this.#device.transferIn(endpointNumber, 64).then(result => {
-			console.log('from usb:', result.data);
+		this.#device.transferIn(endpointNumber, MAX_BYTES_READ).then(result => {
+			const buf = new Uint8Array(result.data.buffer);
+			console.log('from usb:', buf);
+			// TODO: Proper handling of concat data, cobs decode, translate to message...
+			this.dispatchEvent(new CustomEvent('raw-data-received', {detail: buf}));
 			this.readLoop();
 		}, error => {
 			console.log('error', error);
