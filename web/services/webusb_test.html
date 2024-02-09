@@ -16,7 +16,7 @@
 	const sendMessage = () => {
 		const message = {
 			type: MessageType.CMD,
-			subType: MessageSubType.START_SOURCE_SCAN,
+			subType: MessageSubType.DUMMY,
 			seqNo: 123,
 			payload: new Uint8Array([0x04, 0x44, 0x01, 0x02]) // TBD: Payload in concatenated LTV
 		}

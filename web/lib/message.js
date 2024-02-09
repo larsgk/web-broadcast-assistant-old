@@ -26,6 +26,8 @@ export const MessageSubType = Object.freeze({
 	START_SINK_SCAN:	0x01,
 	START_SOURCE_SCAN:	0x02,
 
+	DUMMY:			0x7F,
+
 	// EVT (MSB = 1)
 	SINK_FOUND:		0x81,
 	SOURCE_FOUND:		0x82,

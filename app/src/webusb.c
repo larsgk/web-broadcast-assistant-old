@@ -11,7 +11,7 @@
  */
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(webusb, LOG_LEVEL_ERR);
+LOG_MODULE_REGISTER(webusb, LOG_LEVEL_DBG);
 
 
 #include <zephyr/kernel.h>
@@ -44,7 +44,9 @@ LOG_MODULE_REGISTER(webusb, LOG_LEVEL_ERR);
 
 void (*webusb_cmd_handler)(uint8_t *command_ptr, uint16_t command_length);
 
-uint8_t rx_buf[COBS_ENCODE_DST_BUF_LEN_MAX(CONFIG_WEBUSB_APPLICATION_TX_MAX_PAYLOAD_SIZE)];
+#define MAX_COBS_MESSAGE_SIZE COBS_ENCODE_DST_BUF_LEN_MAX(CONFIG_WEBUSB_APPLICATION_TX_MAX_PAYLOAD_SIZE)
+
+uint8_t rx_buf[MAX_COBS_MESSAGE_SIZE];
 
 #define INITIALIZER_IF(num_ep, iface_class)				\
 	{								\
@@ -108,9 +110,9 @@ static void webusb_tx_work_handler(struct k_work *work_p);
 K_WORK_DEFINE(webusb_tx_work, webusb_tx_work_handler);
 K_MSGQ_DEFINE(webusb_tx_msg_queue, sizeof(webusb_tx_msg_t), CONFIG_WEBUSB_TX_MSG_QUEUE_SIZE, 4);
 
-uint8_t cobs_decoded_stream[WEBUSB_BULK_EP_MPS];
+uint8_t cobs_decoded_stream[MAX_COBS_MESSAGE_SIZE];
 uint16_t cobs_decoded_length;
-uint8_t cobs_encoded_stream[WEBUSB_BULK_EP_MPS];
+uint8_t cobs_encoded_stream[MAX_COBS_MESSAGE_SIZE];
 
 void webusb_init(void)
 {
@@ -224,9 +226,17 @@ int webusb_vendor_handle_req(struct usb_setup_packet *pSetup,
  *
  * @param [in] handlers Pointer to WebUSB command handler structure
  */
-void webusb_register_command_handler(void (*webusb_cmd_handler)(uint8_t *command_ptr, uint16_t command_length))
+void webusb_register_command_handler(void (*cb)(uint8_t *command_ptr, uint16_t command_length))
 {
-	webusb_cmd_handler = webusb_cmd_handler;
+	webusb_cmd_handler = cb;
+}
+
+void print_hex(const uint8_t *ptr, size_t len)
+{
+	while (len-- != 0) {
+		printk("%02x ", *ptr++);
+	}
+	printk("\n");
 }
 
 static void webusb_read_cb(uint8_t ep, int size, void *priv)
@@ -236,7 +246,7 @@ static void webusb_read_cb(uint8_t ep, int size, void *priv)
 
 	LOG_DBG("cfg %p ep %x size %u", cfg, ep, size);
 
-	if ((size <= 0) || (!rx_buf[size-1])) {
+	if ((size <= 0)) { // || (!rx_buf[size-1])) {
 		// Skip empty or non null terminated packages
 		goto done;
 	}
@@ -244,6 +254,8 @@ static void webusb_read_cb(uint8_t ep, int size, void *priv)
 	result = cobs_decode(&cobs_decoded_stream, sizeof(cobs_decoded_stream), rx_buf, strlen(rx_buf));
 	if (result.status == COBS_DECODE_OK) {
 		cobs_decoded_length = result.out_len;
+		LOG_DBG("Decoded COBS to Message, len=%d", result.out_len);
+		print_hex(cobs_decoded_stream, result.out_len);
 		k_work_submit_to_queue(&webusb_workqueue, &webusb_rx_work);
 	} else {
 		LOG_ERR("Could not decode received COBS encoded data! - err: %d", result.status);

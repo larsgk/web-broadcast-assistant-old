@@ -18,7 +18,7 @@
 #include "webusb.h"
 #include "msosv2.h"
 
-LOG_MODULE_REGISTER(main, LOG_LEVEL_ERR);
+LOG_MODULE_REGISTER(main, LOG_LEVEL_DBG);
 
 
 static void heartbeat_timeout_handler(struct k_timer *dummy_p);
@@ -54,11 +54,14 @@ void send_error_response(void) {
 void command_handler(uint8_t *command_ptr, uint16_t command_length)
 {
 	// MISSING PARSING OF COMMANDS AND DEFINITIONS OF THOSE !!!!
-	uint8_t command = 0;
+	uint8_t msg_type = command_ptr[0];
+	uint8_t msg_sub_type = command_ptr[1];
 	#define HEARTBEAT 1
 	#define ON 1
 
-	switch (command) {
+	#define DUMMY 0x7F
+
+	switch (msg_sub_type) {
 		case HEARTBEAT:
 			if (ON) {
 				// Start generating heartbeats every second
@@ -67,6 +70,11 @@ void command_handler(uint8_t *command_ptr, uint16_t command_length)
 				// Stop heartbeat timer if running
 				k_timer_stop(&heartbeat_timer);
 			}
+			send_ok_response();
+			break;
+
+		case DUMMY:
+			LOG_DBG("DUMMY CMD received... send response...");
 			send_ok_response();
 			break;
 
