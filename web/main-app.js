@@ -1,18 +1,44 @@
 // @ts-check
+
+import './components/sink-device-list.js';
+
+import * as AssistantModel from './models/assistant-model.js';
+import { WebUSBDeviceService } from './services/webusb-device-service.js';
+
+const template = document.createElement('template');
+template.innerHTML = `
+<style>
+</style>
+
+<h1>WebUSB Broadcast Assistant...</h1>
+<button id='connect'>CONNECT</button>
+<br><br>
+
+<!-- broadcast sink components... -->
+<button id="scanbtn">SCAN</button>
+<sink-device-list></sink-device-list>
+`;
+
 export class MainApp extends HTMLElement {
 
     constructor() {
         super();
+
+        this.initializeModels();
+
+        const shadowRoot = this.attachShadow({mode: 'open'});
+    }
+
+    initializeModels() {
+        console.log("Initialize Models...");
+
+        AssistantModel.initializeAssistantModel(WebUSBDeviceService);
     }
 
     connectedCallback() {
-        this.innerHTML = `
-        <style>
-        </style>
+        console.log("connectedCallback - MainApp");
 
-        <h1>WebUSB Broadcast Assistant...</h1>
-        <button id='connect'>CONNECT</button>
-        `;
+		this.shadowRoot?.appendChild(template.content.cloneNode(true));
     }
 
 }

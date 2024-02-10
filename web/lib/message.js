@@ -8,7 +8,7 @@ import { cobsEncode, cobsDecode } from './cobs.js';
 * message format:
 *      {
 *              type,           // 1byte, CMD, RES or EVT
-*              subType,        // 1byte, e.g. SinkScanStart (CMD/RES) or SinkFound (EVT)
+*              subType,        // 1byte, e.g. START_SINK_SCAN (CMD/RES) or SINK_FOUND (EVT)
 *              seqNo,          // 1byte, (to match CMD & RES, detect missing EVT)
 *              payloadSize,    // 2byte, byte length of payload
 *              payload         // Nbytes (payload for further processing, Uint8Array)

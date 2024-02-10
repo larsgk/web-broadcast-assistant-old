@@ -258,8 +258,10 @@ static void webusb_read_cb(uint8_t ep, int size, void *priv)
 
 	LOG_DBG("cfg %p ep %x size %u", cfg, ep, size);
 
-	if ((size <= 0)) { // || (!rx_buf[size-1])) {
-		// Skip empty or non null terminated packages
+	if ((size <= 0)) {
+		// Skip empty packages
+		return;
+
 		goto done;
 	}
 
