@@ -157,6 +157,21 @@ export class AssistantModel extends EventTarget {
 
 		this.#service.sendCMD(message)
 	}
+
+	startSourceScan() {
+		console.log("Sending Start Source Scan CMD")
+
+		// Just placeholders, this is not how components should work
+		const message = {
+			type: Number(MessageType.CMD),
+			subType: MessageSubType.START_SOURCE_SCAN,
+			seqNo: 123,
+			payload: new Uint8Array([])
+		};
+
+		this.#service.sendCMD(message)
+	}
+
 }
 
 let _instance = null;

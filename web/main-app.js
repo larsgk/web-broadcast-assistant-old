@@ -1,6 +1,7 @@
 // @ts-check
 
 import './components/sink-device-list.js';
+import './components/source-device-list.js';
 
 import * as AssistantModel from './models/assistant-model.js';
 import { WebUSBDeviceService } from './services/webusb-device-service.js';
@@ -16,8 +17,10 @@ template.innerHTML = `
 
 <!-- broadcast sink components... -->
 <sink-device-list></sink-device-list>
-`;
 
+<!-- broadcast source components... -->
+<source-device-list></source-device-list>
+`;
 export class MainApp extends HTMLElement {
 
     constructor() {

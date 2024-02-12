@@ -2,8 +2,8 @@
 
 import * as AssistantModel from '../models/assistant-model.js';
 
-/*
-* Sink Device List Component
+/**
+Source Device List Component
 */
 
 const template = document.createElement('template');
@@ -23,13 +23,13 @@ template.innerHTML = `
 }
 </style>
 <div id="container">
-<button id="scansnkbtn">SCAN SINK</button>
+<button id="scansrcbtn">SCAN SOURCE</button>
 <div id="list">
 </div>
 </div>
 `;
 
-export class SinkDeviceList extends HTMLElement {
+export class SourceDeviceList extends HTMLElement {
 	#list
 	#scanButton
 
@@ -40,27 +40,27 @@ export class SinkDeviceList extends HTMLElement {
 	}
 
 	connectedCallback() {
-		console.log("connectedCallback - SinkDeviceList");
+		console.log("connectedCallback - SourceDeviceList");
 
 		this.shadowRoot?.appendChild(template.content.cloneNode(true));
 		// Add listeners, etc.
-		this.#scanButton = this.shadowRoot?.querySelector('#scansnkbtn');
+		this.#scanButton = this.shadowRoot?.querySelector('#scansrcbtn');
 		this.#list = this.shadowRoot?.querySelector('#list');
 
-		this.sendStartSinkScan = this.sendStartSinkScan.bind(this);
+		this.sendStartSourceScan = this.sendStartSourceScan.bind(this);
 
-		this.#scanButton.addEventListener('click', this.sendStartSinkScan)
+		this.#scanButton.addEventListener('click', this.sendStartSourceScan)
 	}
 
 	disconnectedCallback() {
 		// Remove listeners, etc.
 	}
 
-	sendStartSinkScan() {
-		console.log("Clicked Start Sink Scan")
+	sendStartSourceScan() {
+		console.log("Clicked Start Source Scan")
 
 		let model = AssistantModel.getInstance();
-		model.startSinkScan();
+		model.startSourceScan();
 
 		// Add fake device element
 		const el = document.createElement('span');
@@ -68,4 +68,4 @@ export class SinkDeviceList extends HTMLElement {
 		this.#list.appendChild(el);
 	}
 }
-customElements.define('sink-device-list', SinkDeviceList);
+customElements.define('source-device-list', SourceDeviceList);
