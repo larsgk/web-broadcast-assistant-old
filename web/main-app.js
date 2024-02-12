@@ -38,6 +38,11 @@ export class MainApp extends HTMLElement {
         console.log("connectedCallback - MainApp");
 
 		this.shadowRoot?.appendChild(template.content.cloneNode(true));
+
+        // Temporatily hook up the connect button here...
+        const button = this.shadowRoot?.querySelector('#connect');
+
+	    button?.addEventListener('click', WebUSBDeviceService.scan);
     }
 
 }
