@@ -1,6 +1,6 @@
 // @ts-check
 
-import { MessageType, MessageSubType } from '../lib/message.js';
+import { parseLTV, MessageType, MessageSubType } from '../lib/message.js';
 
 /**
 * Assistant Model
@@ -10,25 +10,45 @@ import { MessageType, MessageSubType } from '../lib/message.js';
 *
 */
 
+/**
+ * Source device structure
+ *
+ * {
+ * 	bt_name: string | undefined,
+ * 	broadcast_name: string | undefined
+ * 	broadcast_id: uint24, (UNIQUE IDENTIFIER)
+ * 	rssi: int8
+ * }
+ *
+ * Sink device structure
+ *
+ * {
+ * 	bt_addr: string | undefined, (UNIQUE IDENTIFIER)
+ * 	bt_name: string | undefined,
+ * 	connection_state: boolean,
+ * 	security_level: uint8,
+ * 	bass_state: idle | configured | streaming,
+ * 	broadcast_id: uint24,
+ * 	rssi: int8
+ * }
+ */
+
 export class AssistantModel extends EventTarget {
 	#service
-
-	sources = [];
-	sinks = [];
-
-	isScanning = false;
-	serviceIsConnected = false;
+	#sinks
+	#sources
 
 	constructor(service) {
 		super();
 
 		this.#service = service;
+		this.#sinks = [];
+		this.#sources = [];
 
 		this.serviceMessageHandler = this.serviceMessageHandler.bind(this);
 
 		this.addListeners();
 	}
-
 
 	addListeners() {
 		this.#service.addEventListener('connected', evt => {
@@ -57,11 +77,49 @@ export class AssistantModel extends EventTarget {
 	handleSourceFound(data) {
 		console.log(`Handle found Source`);
 		console.log(`Payload:${data}`);
+
+		let scanData = parseLTV(data)
+
+		if (!('broadcast_id' in scanData)) {
+			console.log('Invalid scan data, no broadcast_id present')
+			return;
+		}
+
+		// If existing, just update RSSI, otherwise add to list
+		let sourceDevice = this.#sources.find(sink => sink.broadcast_id === scanData.broadcast_id);
+		if (!sourceDevice) {
+			// This is a new element
+			this.#sources.push(scanData)
+		} else {
+			// This device is already saved, update rssi
+			sourceDevice.rssi = scanData.rssi;
+		}
+
+		this.dispatchEvent(new CustomEvent('sink-updated', {detail: sourceDevice}));
 	}
 
 	handleSinkFound(data) {
 		console.log(`Handle found Sink`);
 		console.log(`Payload:${data}`);
+
+		let scanData = parseLTV(data)
+
+		if (!('bt_addr' in scanData)) {
+			console.log('Invalid scan data, no bt_addr present')
+			return;
+		}
+
+		// If existing, just update RSSI, otherwise add to list
+		let sinkDevice = this.#sinks.find(sink => sink.bt_addr === scanData.bt_addr);
+		if (!sinkDevice) {
+			// This is a new element
+			this.#sinks.push(scanData)
+		} else {
+			// This device is already saved, update rssi
+			sinkDevice.rssi = scanData.rssi;
+		}
+
+		this.dispatchEvent(new CustomEvent('sink-updated', {detail: sinkDevice}));
 	}
 
 	handleCMD(cmd) {
@@ -99,30 +157,7 @@ export class AssistantModel extends EventTarget {
 	}
 
 	serviceMessageHandler(msg) {
-		console.log(`Received event ${msg} in componentMessageHandler`);
-
-		if (msg.type.localeCompare("message") != 0) {
-			console.log(`Unknown event type ${msg.type}`);
-			return;
-		}
-
-		switch (msg.detail.message.type) {
-			case MessageType.CMD:
-			this.handleCMD(msg.detail.message);
-			break;
-			case MessageType.RES:
-			this.handleRES(msg.detail.message);
-			break;
-			case MessageType.EVT:
-			this.handleEVT(msg.detail.message);
-			break;
-			default:
-			console.log(`Could not interpret message with type ${msg.detail.message.type}`);
-		}
-	}
-
-	componentMessageHandler(msg) {
-		console.log(`Received event ${msg} in componentMessageHandler`);
+		console.log(`Received event ${msg} in serviceMessageHandler`);
 
 		if (msg.type.localeCompare("message") != 0) {
 			console.log(`Unknown event type ${msg.type}`);
