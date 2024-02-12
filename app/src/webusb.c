@@ -260,8 +260,6 @@ static void webusb_read_cb(uint8_t ep, int size, void *priv)
 
 	if ((size <= 0)) {
 		// Skip empty packages
-		return;
-
 		goto done;
 	}
 
