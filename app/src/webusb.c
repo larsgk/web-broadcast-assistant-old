@@ -125,10 +125,6 @@ void print_hex(const uint8_t *ptr, size_t len)
 
 void webusb_init(void)
 {
-	usb_bos_register_cap((void *)&bos_cap_webusb);
-	usb_bos_register_cap((void *)&bos_cap_msosv2);
-	usb_bos_register_cap((void *)&bos_cap_lpm);
-
 	k_work_init(&webusb_rx_work, webusb_rx_work_handler);
 	k_work_init(&webusb_tx_work, webusb_tx_work_handler);
 
@@ -201,40 +197,6 @@ static void webusb_tx_work_handler(struct k_work *work_p)
 		usb_transfer_sync(webusb_ep_data[WEBUSB_IN_EP_IDX].ep_addr, cobs_encoded_stream,
 		                  result.out_len, USB_TRANS_WRITE);
 	}
-}
-
-/**
- * @brief Custom handler for standard requests in order to
- *        catch the request and return the WebUSB Platform
- *        Capability Descriptor.
- *
- * @param pSetup    Information about the request to execute.
- * @param len       Size of the buffer.
- * @param data      Buffer containing the request result.
- *
- * @return  0 on success, negative errno code on fail.
- */
-int webusb_custom_handle_req(struct usb_setup_packet *pSetup,
-			     int32_t *len, uint8_t **data)
-{
-	/* Call the handler */
-	return msosv2_custom_handle_req(pSetup, len, data);
-}
-
-/**
- * @brief Handler called for WebUSB vendor specific commands.
- *
- * @param pSetup    Information about the request to execute.
- * @param len       Size of the buffer.
- * @param data      Buffer containing the request result.
- *
- * @return  0 on success, negative errno code on fail.
- */
-int webusb_vendor_handle_req(struct usb_setup_packet *pSetup,
-			     int32_t *len, uint8_t **data)
-{
-	/* Call the handler */
-	return msosv2_vendor_handle_req(pSetup, len, data);
 }
 
 /**
@@ -329,8 +291,8 @@ USBD_DEFINE_CFG_DATA(webusb_config) = {
 	.cb_usb_status = webusb_dev_status_cb,
 	.interface = {
 		.class_handler = NULL,
-		.custom_handler = webusb_custom_handle_req,
-		.vendor_handler = webusb_vendor_handle_req,
+		.custom_handler = msosv2_custom_handle_req,
+		.vendor_handler = msosv2_vendor_handle_req,
 	},
 	.num_endpoints = ARRAY_SIZE(webusb_ep_data),
 	.endpoint = webusb_ep_data

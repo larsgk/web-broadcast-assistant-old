@@ -76,7 +76,10 @@ static struct msosv2_descriptor_t {
 	},
 };
 
-USB_DEVICE_BOS_DESC_DEFINE_CAP struct __packed usb_bos_webusb_desc bos_cap_webusb = {
+USB_DEVICE_BOS_DESC_DEFINE_CAP struct usb_bos_webusb_desc {
+	struct usb_bos_platform_descriptor platform;
+	struct usb_bos_capability_webusb cap;
+} __packed bos_cap_webusb = {
 	/* WebUSB Platform Capability Descriptor:
 	 * https://wicg.github.io/webusb/#webusb-platform-capability-descriptor
 	 */
@@ -104,7 +107,10 @@ USB_DEVICE_BOS_DESC_DEFINE_CAP struct __packed usb_bos_webusb_desc bos_cap_webus
 	}
 };
 
-USB_DEVICE_BOS_DESC_DEFINE_CAP struct __packed usb_bos_msosv2_desc bos_cap_msosv2 = {
+USB_DEVICE_BOS_DESC_DEFINE_CAP struct usb_bos_msosv2_desc {
+	struct usb_bos_platform_descriptor platform;
+	struct usb_bos_capability_msos cap;
+} __packed bos_cap_msosv2 = {
 	/* Microsoft OS 2.0 Platform Capability Descriptor
 	 * See https://docs.microsoft.com/en-us/windows-hardware/drivers/usbcon/
 	 * microsoft-defined-usb-descriptors
@@ -313,4 +319,11 @@ int msosv2_vendor_handle_req(struct usb_setup_packet *pSetup,
 	}
 
 	return -ENOTSUP;
+}
+
+void msosv2_init(void)
+{
+	usb_bos_register_cap((void *)&bos_cap_webusb);
+	usb_bos_register_cap((void *)&bos_cap_msosv2);
+	usb_bos_register_cap((void *)&bos_cap_lpm);
 }

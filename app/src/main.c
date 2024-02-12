@@ -129,6 +129,7 @@ int main(void)
 	LOG_DBG("");
 
 	/* Initialize WebUSB component */
+	msosv2_init();
 	webusb_init();
 
 	/* Set the command handler */
