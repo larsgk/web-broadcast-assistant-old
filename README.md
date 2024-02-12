@@ -28,13 +28,13 @@ west update
 # For normal use (non-development)
 This repo contains a stand alone Zephyr application that can be fetched and initialized like this:
 
-```shell
+```
 west init -m https://github.com/larsgk/web-broadcast-assistant --mr main my-workspace
 ```
 
 Then use west to fetch dependencies:
 
-```shell
+```
 cd my-workspace
 west update
 ```
@@ -47,14 +47,32 @@ Go to the repo folder:
 cd web-broadcast-assistant
 ```
 
-Run:
+## Build
 
+### nRF5340 Audio DK board
+The nRF5340 Audio DK has two cores - one for the application and one dedicated for the network (bluetooth controller).
+The bluetooth controller can be builded from zephyr/samples/bluetooth/hci_ipc:
 ```
-west build -b <target board id> app --pristine
+west build -b nrf5340_audio_dk_nrf5340_cpunet -d build/hci_ipc ../zephyr/samples/bluetooth/hci_ipc --pristine -- -DCONF_FILE=nrf5340_cpunet_iso-bt_ll_sw_split.conf
+```
+### Application
+```
+west build -b <target board id> -d build/app app --pristine
 ```
 
-Flash:
+## Flash
 
+### nRF5340 Audio DK board
+Clear all mem for the two cores with the recover command:
 ```
-west flash
+nrfjprog --recover --coprocessor CP_NETWORK
+nrfjprog --recover
+```
+And flash with the west command:
+```
+west flash -d build/hci_ipc
+```
+### Application
+```
+west flash -d build/app
 ```
