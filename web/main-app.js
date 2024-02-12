@@ -15,7 +15,6 @@ template.innerHTML = `
 <br><br>
 
 <!-- broadcast sink components... -->
-<button id="scanbtn">SCAN</button>
 <sink-device-list></sink-device-list>
 `;
 

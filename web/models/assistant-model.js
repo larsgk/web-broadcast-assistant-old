@@ -9,9 +9,9 @@ import { MessageType, MessageSubType } from '../lib/message.js';
 * Handles commands, responses and events
 *
 */
+
 export class AssistantModel extends EventTarget {
-	service
-	component
+	#service
 
 	sources = [];
 	sinks = [];
@@ -19,30 +19,27 @@ export class AssistantModel extends EventTarget {
 	isScanning = false;
 	serviceIsConnected = false;
 
-	constructor(service, component) {
+	constructor(service) {
 		super();
 
-		this.service = service;
-		this.component = component;
+		this.#service = service;
 
 		this.serviceMessageHandler = this.serviceMessageHandler.bind(this);
-		this.componentMessageHandler = this.componentMessageHandler.bind(this);
 
-		this.initialize();
+		this.addListeners();
 	}
 
 
-	initialize() {
-		this.service.addEventListener('connected', evt => {
+	addListeners() {
+		this.#service.addEventListener('connected', evt => {
 			console.log('AssistantModel registered Service as connected');
 			this.serviceIsConnected = true;
 		});
-		this.service.addEventListener('disconnected', evt => {
+		this.#service.addEventListener('disconnected', evt => {
 			console.log('AssistantModel registered Service as disconnected');
 			this.serviceIsConnected = false;
 		});
-		this.service.addEventListener('message', this.serviceMessageHandler);
-		this.component.addEventListener('message', this.componentMessageHandler);
+		this.#service.addEventListener('message', this.serviceMessageHandler);
 	}
 
 	handleStartSinkScan() {
@@ -146,4 +143,33 @@ export class AssistantModel extends EventTarget {
 			console.log(`Could not interpret message with type ${msg.detail.message.type}`);
 		}
 	}
+
+	startSinkScan() {
+		console.log("Sending Start Sink Scan CMD")
+
+		// Just placeholders, this is not how components should work
+		const message = {
+			type: Number(MessageType.CMD),
+			subType: MessageSubType.START_SINK_SCAN,
+			seqNo: 123,
+			payload: new Uint8Array([])
+		};
+
+		this.#service.sendCMD(message)
+	}
+}
+
+let _instance = null;
+
+export const initializeAssistantModel = deviceService => {
+        if (!_instance) {
+                _instance = new AssistantModel(deviceService);
+        }
+}
+
+export const getInstance = () => {
+        if (!_instance) {
+                throw Error("AssistantModel not instantiated...");
+        }
+        return _instance;
 }
