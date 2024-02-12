@@ -1,6 +1,7 @@
 // @ts-check
 
-import { MessageType, MessageSubType } from '../lib/message.js';
+import { arrayToMsg, msgToArray, MessageType, MessageSubType } from '../lib/message.js';
+import { cobsEncode, cobsDecode } from '../lib/cobs.js';
 
 /**
 * WebUSB Device Service
@@ -50,10 +51,23 @@ export const WebUSBDeviceService = new class extends EventTarget {
 
 	sendData(data) {
 		console.log(`Sending ${data.length} bytes to USB:`, data);
+		
+		if (!this.#device) {
+			console.log('Device not connected...');
+			return;
+		}
+
 		const {
 			endpointNumber
 		} = this.#device.configuration.interfaces[0].alternate.endpoints[1]
 		return this.#device.transferOut(endpointNumber, data);
+	}
+
+	sendCMD(message) {
+		let arrayIn = msgToArray(message);
+		let encoded = cobsEncode(arrayIn, true);
+
+		this.sendData(encoded)
 	}
 
 	async _openDevice(device) {
