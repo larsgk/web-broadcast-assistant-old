@@ -118,3 +118,22 @@ export const arrayToMsg = data => {
 		payload: data.slice(5)
 	}
 }
+
+export const parseLTV = ltv => {
+	/**
+	 *  This should parse the LTV structure and produce an object looking something like:
+	 *
+	 * {
+	 * 	bt_name: string | undefined
+	 * 	uuid16: []
+	 * 	rssi: int8
+	 * }
+	 */
+
+	// Just return a stupid mock rock now
+	return {
+		bt_name: "my_device",
+		broadcast_id: "a_nice_id",
+		rssi: 0
+	 }
+}
