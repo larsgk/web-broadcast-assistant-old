@@ -62,18 +62,6 @@ export class AssistantModel extends EventTarget {
 		this.#service.addEventListener('message', this.serviceMessageHandler);
 	}
 
-	handleStartSinkScan() {
-		console.log(`Tell component to start sink scanning`);
-	}
-
-	handleStartSourceScan() {
-		console.log(`Tell component to start source scanning`);
-	}
-
-	parseDevice(adData) {
-		console.log(`Data to parse: ${adData}`);
-	}
-
 	handleSourceFound(data) {
 		console.log(`Handle found Source`);
 		console.log(`Payload:${data}`);
@@ -127,10 +115,12 @@ export class AssistantModel extends EventTarget {
 
 		switch (cmd.subType) {
 			case MessageSubType.START_SINK_SCAN:
-			this.handleStartSinkScan();
+			this.startSinkScan();
 			break;
 			case MessageSubType.START_SOURCE_SCAN:
-			this.handleStartSourceScan();
+			this.startSourceScan();
+			case MessageSubType.STOP_SCAN:
+			this.stopScan();
 			break;
 			default:
 			console.log(`Could not interpret command with subType ${cmd.subType}`);
@@ -200,6 +190,20 @@ export class AssistantModel extends EventTarget {
 		const message = {
 			type: Number(MessageType.CMD),
 			subType: MessageSubType.START_SOURCE_SCAN,
+			seqNo: 123,
+			payload: new Uint8Array([])
+		};
+
+		this.#service.sendCMD(message)
+	}
+
+	stopScan() {
+		console.log("Sending Stop Scan CMD")
+
+		// Just placeholders, this is not how components should work
+		const message = {
+			type: Number(MessageType.CMD),
+			subType: MessageSubType.STOP_SCAN,
 			seqNo: 123,
 			payload: new Uint8Array([])
 		};
