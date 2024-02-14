@@ -1,6 +1,12 @@
 // @ts-check
 
-import { parseLTV, MessageType, MessageSubType } from '../lib/message.js';
+import {
+	MessageType,
+	MessageSubType,
+	BT_DataType,
+	ltvToArray,
+	ltvArrayFindValue
+} from '../lib/message.js';
 
 /**
 * Assistant Model
@@ -62,10 +68,12 @@ export class AssistantModel extends EventTarget {
 		this.#service.addEventListener('message', this.serviceMessageHandler);
 	}
 
-	handleSourceFound(data) {
+	handleSourceFound(message) {
 		console.log(`Handle found Source`);
-		console.log(`Payload:${data}`);
+		const payloadArray = ltvToArray(message.payload);
+		console.log('Payload', payloadArray);
 
+		/* TBD on this block
 		let scanData = parseLTV(data)
 
 		if (!('broadcast_id' in scanData)) {
@@ -82,16 +90,26 @@ export class AssistantModel extends EventTarget {
 			// This device is already saved, update rssi
 			sourceDevice.rssi = scanData.rssi;
 		}
+		*/
 
-		this.dispatchEvent(new CustomEvent('sink-updated', {detail: sourceDevice}));
+		const source = {
+			name: ltvArrayFindValue(payloadArray, [
+				BT_DataType.BT_DATA_NAME_SHORTENED,
+				BT_DataType.BT_DATA_NAME_COMPLETE
+			])?.value
+		}
+
+		this.dispatchEvent(new CustomEvent('source-found', {detail: { source }}));
+
 	}
 
-	handleSinkFound(data) {
+	handleSinkFound(message) {
 		console.log(`Handle found Sink`);
-		console.log(`Payload:${data}`);
 
-		let scanData = parseLTV(data)
+		const payloadArray = ltvToArray(message.payload);
+		console.log('Payload', payloadArray);
 
+		/* TBD on this block
 		if (!('bt_addr' in scanData)) {
 			console.log('Invalid scan data, no bt_addr present')
 			return;
@@ -106,66 +124,66 @@ export class AssistantModel extends EventTarget {
 			// This device is already saved, update rssi
 			sinkDevice.rssi = scanData.rssi;
 		}
+		*/
 
-		this.dispatchEvent(new CustomEvent('sink-updated', {detail: sinkDevice}));
-	}
 
-	handleCMD(cmd) {
-		console.log(`Command with subType ${cmd.subType}`);
-
-		switch (cmd.subType) {
-			case MessageSubType.START_SINK_SCAN:
-			this.startSinkScan();
-			break;
-			case MessageSubType.START_SOURCE_SCAN:
-			this.startSourceScan();
-			case MessageSubType.STOP_SCAN:
-			this.stopScan();
-			break;
-			default:
-			console.log(`Could not interpret command with subType ${cmd.subType}`);
+		// Find a name and add that (alone) to the sink device
+		// TODO: if sink is already in the list, just update, e.g. RSSI
+		const sink = {
+			name: ltvArrayFindValue(payloadArray, [
+				BT_DataType.BT_DATA_NAME_SHORTENED,
+				BT_DataType.BT_DATA_NAME_COMPLETE
+			])?.value || "UNKNOWN",
+			uuid16s: ltvArrayFindValue(payloadArray, [
+				BT_DataType.BT_DATA_UUID16_ALL,
+				BT_DataType.BT_DATA_UUID16_SOME,
+			])?.value || []
 		}
+
+		this.dispatchEvent(new CustomEvent('sink-found', {detail: { sink }}));
 	}
 
 	handleRES(msg) {
 		console.log(`Response message ${msg.type}`);
 	}
 
-	handleEVT(evt) {
-		console.log(`Event with subType ${evt.subType}`);
+	handleEVT(message) {
+		console.log(`Event with subType ${message.subType}`);
 
-		switch (evt.subType) {
+		switch (message.subType) {
 			case MessageSubType.SINK_FOUND:
-			this.handleSinkFound(evt.payload);
+			this.handleSinkFound(message);
 			break;
 			case MessageSubType.SOURCE_FOUND:
-			this.handleSourceFound(evt.payload);
+			this.handleSourceFound(message);
 			break;
 			default:
-			console.log(`Could not interpret event with subType ${evt.subType}`);
+			console.log(`Could not interpret event with subType ${message.subType}`);
 		}
 	}
 
-	serviceMessageHandler(msg) {
-		console.log(`Received event ${msg} in serviceMessageHandler`);
+	serviceMessageHandler(evt) {
+		const { message } = evt.detail;
 
-		if (msg.type.localeCompare("message") != 0) {
-			console.log(`Unknown event type ${msg.type}`);
+		if (!message) {
+			console.warn("No message in event!");
 			return;
 		}
 
-		switch (msg.detail.message.type) {
-			case MessageType.CMD:
-			this.handleCMD(msg.detail.message);
-			break;
+		if (message.type !== MessageType.EVT && message.type !== MessageType.RES) {
+			console.log(`Unknown message type ${message.type}`);
+			return;
+		}
+
+		switch (message.type) {
 			case MessageType.RES:
-			this.handleRES(msg.detail.message);
+			this.handleRES(message);
 			break;
 			case MessageType.EVT:
-			this.handleEVT(msg.detail.message);
+			this.handleEVT(message);
 			break;
 			default:
-			console.log(`Could not interpret message with type ${msg.detail.message.type}`);
+			console.log(`Could not interpret message with type ${message.type}`);
 		}
 	}
 
@@ -216,14 +234,14 @@ export class AssistantModel extends EventTarget {
 let _instance = null;
 
 export const initializeAssistantModel = deviceService => {
-        if (!_instance) {
-                _instance = new AssistantModel(deviceService);
-        }
+	if (!_instance) {
+		_instance = new AssistantModel(deviceService);
+	}
 }
 
 export const getInstance = () => {
-        if (!_instance) {
-                throw Error("AssistantModel not instantiated...");
-        }
-        return _instance;
+	if (!_instance) {
+		throw Error("AssistantModel not instantiated...");
+	}
+	return _instance;
 }

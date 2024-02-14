@@ -23,6 +23,7 @@ export const WebUSBDeviceService = new class extends EventTarget {
 		super();
 
 		this.scan = this.scan.bind(this);
+		this.sendCMD = this.sendCMD.bind(this);
 		this.sendData = this.sendData.bind(this);
 	}
 
@@ -40,9 +41,15 @@ export const WebUSBDeviceService = new class extends EventTarget {
 		} = this.#device.configuration.interfaces[0].alternate.endpoints[0]
 		this.#device.transferIn(endpointNumber, MAX_BYTES_READ).then(result => {
 			const buf = new Uint8Array(result.data.buffer);
+
 			console.log('from usb:', buf);
-			// TODO: Proper handling of concat data, cobs decode, translate to message...
-			this.dispatchEvent(new CustomEvent('raw-data-received', {detail: buf}));
+			this.dispatchEvent(new CustomEvent('raw-data-received', {detail: { buf }}));
+
+			// decode to message
+			let decoded = cobsDecode(buf, true);
+			const message = arrayToMsg(decoded);
+			this.dispatchEvent(new CustomEvent('message', {detail: { message }}));
+
 			this.readLoop();
 		}, error => {
 			console.log('error', error);
@@ -51,7 +58,7 @@ export const WebUSBDeviceService = new class extends EventTarget {
 
 	sendData(data) {
 		console.log(`Sending ${data.length} bytes to USB:`, data);
-		
+
 		if (!this.#device) {
 			console.log('Device not connected...');
 			return;
@@ -84,9 +91,5 @@ export const WebUSBDeviceService = new class extends EventTarget {
 
 		//console.log('device opened', this.#device)
 		this.readLoop();
-	}
-
-	sendMessageAsEvent(message) {
-		this.dispatchEvent(new CustomEvent('message', { detail: { message }}));
 	}
 }

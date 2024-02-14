@@ -13,9 +13,6 @@ template.innerHTML = `
 #container {
 	display: flex;
 	flex-direction: column;
-	width: 95%;
-	max-width: 700px;
-	background: green;
 }
 #list {
 	display: flex;
