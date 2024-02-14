@@ -11,7 +11,7 @@
  */
 
 #include <zephyr/logging/log.h>
-LOG_MODULE_REGISTER(webusb, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(webusb, LOG_LEVEL_ERR);
 
 
 #include <zephyr/kernel.h>
@@ -20,6 +20,7 @@ LOG_MODULE_REGISTER(webusb, LOG_LEVEL_DBG);
 #include <zephyr/usb/usb_device.h>
 #include <usb_descriptor.h>
 
+#include "command.h"
 #include "webusb.h"
 #include "cobs.h"
 #include "msosv2.h"
@@ -42,7 +43,7 @@ LOG_MODULE_REGISTER(webusb, LOG_LEVEL_DBG);
 #define WEBUSB_WORKQUEUE_STACK_SIZE 2048
 #define WEBUSB_WORKQUEUE_PRIORITY K_PRIO_PREEMPT(1)
 
-void (*webusb_cmd_handler)(uint8_t *command_ptr, uint16_t command_length);
+void (*webusb_cmd_handler)(struct command_message *command_ptr, uint16_t command_length);
 
 #define MAX_COBS_MESSAGE_SIZE COBS_ENCODE_DST_BUF_LEN_MAX(CONFIG_WEBUSB_APPLICATION_TX_MAX_PAYLOAD_SIZE)
 
@@ -114,14 +115,17 @@ uint8_t cobs_decoded_stream[MAX_COBS_MESSAGE_SIZE];
 uint16_t cobs_decoded_length;
 uint8_t cobs_encoded_stream[MAX_COBS_MESSAGE_SIZE];
 
+/*#define WEBUSB_DEBUG*/
 
-void print_hex(const uint8_t *ptr, size_t len)
+#ifdef WEBUSB_DEBUG
+static void print_hex(const uint8_t *ptr, size_t len)
 {
 	while (len-- != 0) {
 		printk("%02x ", *ptr++);
 	}
 	printk("\n");
 }
+#endif /* WEBUSB_DEBUG */
 
 void webusb_init(void)
 {
@@ -142,8 +146,9 @@ int webusb_transmit(uint8_t *data, uint16_t size)
 	int ret;
 
 	LOG_DBG("Preparing to send data (len=%d)", size);
+#ifdef WEBUSB_DEBUG
 	print_hex(data, size);
-
+#endif /* WEBUSB_DEBUG */
 	if (size > CONFIG_WEBUSB_APPLICATION_TX_MAX_PAYLOAD_SIZE) {
 		return -EINVAL;
 	}
@@ -171,7 +176,7 @@ static void webusb_rx_work_handler(struct k_work *work_p)
 	ARG_UNUSED(work_p);
 
 	if (webusb_cmd_handler) {
-		webusb_cmd_handler((uint8_t*)&cobs_decoded_stream, cobs_decoded_length);
+		webusb_cmd_handler((struct command_message *)&cobs_decoded_stream, cobs_decoded_length);
 	}
 }
 
@@ -207,7 +212,7 @@ static void webusb_tx_work_handler(struct k_work *work_p)
  *
  * @param [in] handlers Pointer to WebUSB command handler structure
  */
-void webusb_register_command_handler(void (*cb)(uint8_t *command_ptr, uint16_t command_length))
+void webusb_register_command_handler(void (*cb)(struct command_message *command_ptr, uint16_t command_length))
 {
 	webusb_cmd_handler = cb;
 }
@@ -229,7 +234,9 @@ static void webusb_read_cb(uint8_t ep, int size, void *priv)
 	if (result.status == COBS_DECODE_OK) {
 		cobs_decoded_length = result.out_len;
 		LOG_DBG("Decoded COBS to Message, len=%d", result.out_len);
+#ifdef WEBUSB_DEBUG
 		print_hex(cobs_decoded_stream, result.out_len);
+#endif /* WEBUSB_DEBUG */
 		k_work_submit_to_queue(&webusb_workqueue, &webusb_rx_work);
 	} else {
 		LOG_ERR("Could not decode received COBS encoded data! - err: %d", result.status);
