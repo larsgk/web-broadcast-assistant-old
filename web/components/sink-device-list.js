@@ -2,6 +2,9 @@
 
 import * as AssistantModel from '../models/assistant-model.js';
 
+import './sink-item.js';
+import './app-button.js';
+
 /*
 * Sink Device List Component
 */
@@ -10,12 +13,14 @@ const template = document.createElement('template');
 template.innerHTML = `
 <style>
 /* Styles go here */
+
+#scan {
+	border-radius: 20px;
+}
+
 #container {
 	display: flex;
 	flex-direction: column;
-	width: 95%;
-	max-width: 700px;
-	background: green;
 }
 #list {
 	display: flex;
@@ -23,7 +28,7 @@ template.innerHTML = `
 }
 </style>
 <div id="container">
-<button id="scansnkbtn">SCAN SINK</button>
+<app-button id="scan">SCAN SINK</app-button>
 <div id="list">
 </div>
 </div>
@@ -32,9 +37,12 @@ template.innerHTML = `
 export class SinkDeviceList extends HTMLElement {
 	#list
 	#scanButton
+	#model
 
 	constructor() {
 		super();
+
+		this.addFoundSink = this.addFoundSink.bind(this);
 
 		const shadowRoot = this.attachShadow({mode: 'open'});
 	}
@@ -44,12 +52,16 @@ export class SinkDeviceList extends HTMLElement {
 
 		this.shadowRoot?.appendChild(template.content.cloneNode(true));
 		// Add listeners, etc.
-		this.#scanButton = this.shadowRoot?.querySelector('#scansnkbtn');
+		this.#scanButton = this.shadowRoot?.querySelector('#scan');
 		this.#list = this.shadowRoot?.querySelector('#list');
 
 		this.sendStartSinkScan = this.sendStartSinkScan.bind(this);
 
-		this.#scanButton.addEventListener('click', this.sendStartSinkScan)
+		this.#scanButton.addEventListener('click', this.sendStartSinkScan);
+
+		this.#model = AssistantModel.getInstance();
+
+		this.#model.addEventListener('sink-found', this.addFoundSink)
 	}
 
 	disconnectedCallback() {
@@ -59,13 +71,18 @@ export class SinkDeviceList extends HTMLElement {
 	sendStartSinkScan() {
 		console.log("Clicked Start Sink Scan")
 
-		let model = AssistantModel.getInstance();
-		model.startSinkScan();
+		this.#model.startSinkScan();
+	}
 
-		// Add fake device element
-		const el = document.createElement('span');
-		el.innerHTML = "Nice device...";
+	addFoundSink(evt) {
+		const { sink } = evt.detail;
+
+		console.log('EVT', evt);
+
+		// Just use the name for now... ignore duplicates...
+		const el = document.createElement('sink-item');
 		this.#list.appendChild(el);
+		el.setModel(sink);
 	}
 }
 customElements.define('sink-device-list', SinkDeviceList);

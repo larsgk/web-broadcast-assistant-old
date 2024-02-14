@@ -1,18 +1,19 @@
 // @ts-check
 
 import { cobsEncode, cobsDecode } from './cobs.js';
+import { arrayToHex } from './helpers.js';
 
 /**
 * This module contains enums and functions related to messages
 *
 * message format:
-*      {
+*
 *              type,           // 1byte, CMD, RES or EVT
 *              subType,        // 1byte, e.g. START_SINK_SCAN (CMD/RES) or SINK_FOUND (EVT)
 *              seqNo,          // 1byte, (to match CMD & RES, detect missing EVT)
 *              payloadSize,    // 2byte, byte length of payload
 *              payload         // Nbytes (payload for further processing, Uint8Array)
-*      }
+*
 */
 
 export const MessageType = Object.freeze({
@@ -34,6 +35,24 @@ export const MessageSubType = Object.freeze({
 	SOURCE_FOUND:		0x82,
 
 	HEARTBEAT:		0xFF,
+});
+
+export const BT_DataType = Object.freeze({
+	BT_DATA_UUID16_SOME:		0x02,
+	BT_DATA_UUID16_ALL:		0x03,
+	BT_DATA_UUID32_SOME:		0x04,
+	BT_DATA_UUID32_ALL:		0x05,
+
+	BT_DATA_NAME_SHORTENED:		0x08,
+	BT_DATA_NAME_COMPLETE:		0x09,
+
+	BT_DATA_SVC_DATA16:		0x16,
+
+	BT_DATA_BROADCAST_NAME:		0x30,
+});
+
+export const BT_UUID = Object.freeze({
+	BT_UUID_BROADCAST_AUDIO:	0x1852,
 });
 
 export const msgToArray = msg => {
@@ -68,7 +87,7 @@ export const msgToArray = msg => {
 		} else if (Number.isInteger(payloadSize)) {
 			if (payloadSize !== actSize) {
 				throw new Error(`Actual payload size (${actSize})` +
-						` != payloadSize (${msg.payloadSize})`);
+				` != payloadSize (${msg.payloadSize})`);
 			}
 		} else {
 			throw new Error(`Invalid payloadSize (${payloadSize})`);
@@ -120,21 +139,97 @@ export const arrayToMsg = data => {
 	}
 }
 
-export const parseLTV = ltv => {
-	/**
-	 *  This should parse the LTV structure and produce an object looking something like:
-	 *
-	 * {
-	 * 	bt_name: string | undefined
-	 * 	uuid16: []
-	 * 	rssi: int8
-	 * }
-	 */
+const utf8decoder = new TextDecoder();
 
-	// Just return a stupid mock rock now
-	return {
-		bt_name: "my_device",
-		broadcast_id: "a_nice_id",
-		rssi: 0
-	 }
+const bufToValueArray = (data, itemsize) => {
+	// Used to extract uint8, 16, 24 or 32 values
+	if (!(data instanceof Uint8Array)) {
+		throw new Error("Input data must be a Uint8Array");
+	}
+
+	if (itemsize < 1 || itemsize > 4) {
+		return [];
+	}
+
+	if (data.length % itemsize !== 0) {
+		return [];
+	}
+
+	const res = [];
+	let ptr = 0;
+	while (ptr < data.length) {
+		let item = 0;
+		let count = 0;
+		while(count < itemsize) {
+			item += data[ptr++] << (8*count);
+			count++;
+		}
+		res.push(item);
+	}
+
+	return res;
+}
+
+const parseLTVItem = (type, len, value) => {
+	// type: uint8 (AD type)
+	// len: utin8
+	// value: Uint8Array
+
+	if (len === 0 || len != value.length) {
+		return;
+	}
+
+	const item = { type };
+	// For now, just parse the ones we know
+	switch (type) {
+		case BT_DataType.BT_DATA_NAME_SHORTENED:
+		case BT_DataType.BT_DATA_NAME_COMPLETE:
+		case BT_DataType.BT_DATA_BROADCAST_NAME:
+		item.value = utf8decoder.decode(value);
+		break;
+		case BT_DataType.BT_DATA_UUID16_SOME:
+		case BT_DataType.BT_DATA_UUID16_ALL:
+		item.value = bufToValueArray(value, 2);
+		break;
+		case BT_DataType.BT_DATA_UUID32_SOME:
+		case BT_DataType.BT_DATA_UUID32_ALL:
+		item.value = bufToValueArray(value, 4);
+		break;
+		default:
+		item.value = "UNHANDLED";
+		break;
+	}
+
+	return item;
+}
+
+export const ltvToArray = payload => {
+	const res = [];
+
+	console.log('LTV decode of: ', arrayToHex(payload));
+	let ptr = 0;
+	// Iterate over the LTV fields and convert to items in array.
+	while (ptr < payload.length) {
+		const len = payload[ptr++] - 1;
+		const type = payload[ptr++];
+		if (ptr + len > payload.length) {
+			console.warn("Error in LTV structure");
+			break;
+		}
+		const value = payload.subarray(ptr, ptr + len);
+		ptr += len;
+
+		const item = parseLTVItem(type, len, value);
+		if (item) {
+			res.push(item);
+		}
+	}
+
+	return res;
+}
+
+export const ltvArrayFindValue = (arr, types) => {
+	// This will find and return the first value, matching any type given
+
+	return arr.find(item => types.includes(item.type));
 }
