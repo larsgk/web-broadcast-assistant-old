@@ -94,44 +94,43 @@ void command_handler(struct command_message *command_ptr, uint16_t command_lengt
 	uint8_t msg_seq_no = command_ptr->seq_no;
 
 	switch (msg_sub_type) {
-		case MESSAGE_SUBTYPE_HEARTBEAT:
-			if (HEARTBEAT_ON) {
-				// Start generating heartbeats every second
-				k_timer_start(&heartbeat_timer, K_SECONDS(1), K_SECONDS(1));
-			} else {
-				// Stop heartbeat timer if running
-				k_timer_stop(&heartbeat_timer);
-			}
-			send_ok_response();
-			break;
+	case MESSAGE_SUBTYPE_HEARTBEAT:
+		if (HEARTBEAT_ON) {
+			// Start generating heartbeats every second
+			k_timer_start(&heartbeat_timer, K_SECONDS(1), K_SECONDS(1));
+		} else {
+			// Stop heartbeat timer if running
+			k_timer_stop(&heartbeat_timer);
+		}
+		send_ok_response();
+		break;
 
-		case MESSAGE_SUBTYPE_DUMMY:
-			LOG_DBG("DUMMY CMD received... send response...");
-			send_dummy_response(msg_seq_no);
-			break;
+	case MESSAGE_SUBTYPE_DUMMY:
+		LOG_DBG("DUMMY CMD received... send response...");
+		send_dummy_response(msg_seq_no);
+		break;
 
-		case MESSAGE_SUBTYPE_START_SINK_SCAN:
-			LOG_DBG("MESSAGE_SUBTYPE_START_SINK_SCAN");
-			scan_for_broadcast_sink(msg_seq_no);
-			break;
+	case MESSAGE_SUBTYPE_START_SINK_SCAN:
+		LOG_DBG("MESSAGE_SUBTYPE_START_SINK_SCAN");
+		scan_for_broadcast_sink(msg_seq_no);
+		break;
 
-		case MESSAGE_SUBTYPE_START_SOURCE_SCAN:
-			LOG_DBG("MESSAGE_SUBTYPE_START_SOURCE_SCAN");
-			scan_for_broadcast_source(msg_seq_no);
-			break;
+	case MESSAGE_SUBTYPE_START_SOURCE_SCAN:
+		LOG_DBG("MESSAGE_SUBTYPE_START_SOURCE_SCAN");
+		scan_for_broadcast_source(msg_seq_no);
+		break;
 
-		case MESSAGE_SUBTYPE_STOP_SCAN:
-			LOG_DBG("MESSAGE_SUBTYPE_STOP_SCAN");
-			stop_scanning(msg_seq_no);
-			break;
+	case MESSAGE_SUBTYPE_STOP_SCAN:
+		LOG_DBG("MESSAGE_SUBTYPE_STOP_SCAN");
+		stop_scanning(msg_seq_no);
+		break;
 
-		default:
-			// Unrecognized command
-			send_error_response();
-			break;
+	default:
+		// Unrecognized command
+		send_error_response();
+		break;
 	}
 }
-
 
 void command_init(void) {
 	k_timer_init(&heartbeat_timer, heartbeat_timeout_handler, NULL);
