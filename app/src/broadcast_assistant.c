@@ -24,8 +24,17 @@ LOG_MODULE_REGISTER(broadcast_assistant, LOG_LEVEL_INF);
 #define BT_NAME_LEN 30
 #define INVALID_BROADCAST_ID 0xFFFFFFFFU
 
-static bool scanning_for_broadcast_source;
+enum broadcast_assistant_state {
+	BROADCAST_ASSISTANT_STATE_IDLE,
+	BROADCAST_ASSISTANT_STATE_SCAN_SOURCE,
+	BROADCAST_ASSISTANT_STATE_SCAN_SINK
+};
 
+static enum broadcast_assistant_state ba_state;
+
+static bool device_found(struct bt_data *data, void *user_data);
+static bool scan_for_source(const struct bt_le_scan_recv_info *info, struct net_buf_simple *ad);
+static bool scan_for_sink(const struct bt_le_scan_recv_info *info, struct net_buf_simple *ad);
 static void scan_recv_cb(const struct bt_le_scan_recv_info *info, struct net_buf_simple *ad);
 static void scan_timeout_cb(void);
 
@@ -135,100 +144,110 @@ static bool device_found(struct bt_data *data, void *user_data)
 	}
 }
 
+static bool scan_for_source(const struct bt_le_scan_recv_info *info, struct net_buf_simple *ad)
+{
+	struct scan_recv_info sr_info = {0};
+
+	/* Scan for and select Broadcast Source */
+
+	sr_info.broadcast_id = INVALID_BROADCAST_ID;
+
+	/* We are only interested in non-connectable periodic advertisers */
+	if ((info->adv_props & BT_GAP_ADV_PROP_CONNECTABLE) != 0 || info->interval == 0) {
+		LOG_DBG("Connectable...");
+		return false;
+	}
+
+	LOG_DBG("Maybe broadcast...");
+
+	bt_data_parse(ad, device_found, (void *)&sr_info);
+
+	if (sr_info.broadcast_id != INVALID_BROADCAST_ID) {
+		LOG_INF("Broadcast Source Found [name, b_name, b_id] = [\"%s\", \"%s\", 0x%06x]",
+			sr_info.bt_name, sr_info.broadcast_name, sr_info.broadcast_id);
+
+		/* TODO: Also, we need to add the following information for
+		 * bt_bap_broadcast_assistant_add_src
+		 */
+
+		/* selected_broadcast_id = sr_info.broadcast_id;
+		selected_sid = info->sid;
+		selected_pa_interval = info->interval;
+		bt_addr_le_copy(&selected_addr, info->addr); */
+
+		/* TODO: Add support for syncing to the PA and parsing the BASE
+		 * in order to obtain the right subgroup information to send to
+		 * the sink when adding a broadcast source (see in main function below).
+		 */
+
+		return true;
+	}
+
+	return false;
+}
+
+static bool scan_for_sink(const struct bt_le_scan_recv_info *info, struct net_buf_simple *ad)
+{
+	struct scan_recv_info sr_info = {0};
+
+	/* Scan for and connect to Broadcast Sink */
+
+	/* We are only interested in connectable advertisers */
+	if ((info->adv_props & BT_GAP_ADV_PROP_CONNECTABLE) == 0) {
+		return false;
+	}
+
+	bt_data_parse(ad, device_found, (void *)&sr_info);
+
+	if (sr_info.has_bass) {
+		LOG_INF("Broadcast Sink Found: [\"%s\"]", sr_info.bt_name);
+
+		return true;
+	}
+
+	return false;
+}
+
 static void scan_recv_cb(const struct bt_le_scan_recv_info *info, struct net_buf_simple *ad)
 {
 	int err;
-	struct scan_recv_info sr_info = {0};
 	struct command_message msg;
+	struct net_buf_simple ad_clone;
 
 	LOG_DBG("scan cb...");
 
-	if (scanning_for_broadcast_source) {
-		/* Scan for and select Broadcast Source */
+	/* For now, just make a copy if we need to send it */
+	net_buf_simple_clone(ad, &ad_clone);
 
-		sr_info.broadcast_id = INVALID_BROADCAST_ID;
-
-		/* We are only interested in non-connectable periodic advertisers */
-		if ((info->adv_props & BT_GAP_ADV_PROP_CONNECTABLE) != 0 || info->interval == 0) {
-			LOG_DBG("Connectable...");
-			return;
-		}
-
-		LOG_DBG("...maybe broadcast");
-
-		/* For now, just make a copy if we need to send it */
-		struct net_buf_simple buf_copy;
-		net_buf_simple_clone(ad, &buf_copy);
-
-		bt_data_parse(ad, device_found, (void *)&sr_info);
-
-		if (sr_info.broadcast_id != INVALID_BROADCAST_ID) {
-			LOG_INF("Broadcast Source Found:");
-			LOG_INF("[name, br_name, br_id] = [\"%s\", \"%s\", 0x%06x]",
-				sr_info.bt_name, sr_info.broadcast_name, sr_info.broadcast_id);
-
-			/* Send the full advertising result */
-
-			// TBD: the netbuf clone is used here
-			msg.type = MESSAGE_TYPE_EVT;
+	switch (ba_state) {
+	case BROADCAST_ASSISTANT_STATE_SCAN_SOURCE:
+		if (scan_for_source(info, ad)) {
+			/* broadcast source found */
 			msg.sub_type = MESSAGE_SUBTYPE_SOURCE_FOUND;
-			msg.seq_no = 0;
-			msg.length = buf_copy.len;
-			memcpy(msg.payload, buf_copy.data, buf_copy.len);
-
-			err = webusb_transmit((uint8_t*)&msg, buf_copy.len + 5);
-			if (err != 0) {
-				LOG_ERR("FAILED TO SEND Source Found EVT (err=%d)", err);
-			}
-
-			/* TODO: Also, we need to add the following information for
-			 * bt_bap_broadcast_assistant_add_src
-			 */
-
-			/* selected_broadcast_id = sr_info.broadcast_id;
-			selected_sid = info->sid;
-			selected_pa_interval = info->interval;
-			bt_addr_le_copy(&selected_addr, info->addr); */
-
-			/* TODO: Add support for syncing to the PA and parsing the BASE
-			 * in order to obtain the right subgroup information to send to
-			 * the sink when adding a broadcast source (see in main function below).
-			 */
-
+			break; /* send message */
 		}
-	} else {
-		/* Scan for and connect to Broadcast Sink */
-
-		/* We are only interested in connectable advertisers */
-		if ((info->adv_props & BT_GAP_ADV_PROP_CONNECTABLE) == 0) {
-			return;
-		}
-
-		/* For now, just make a copy if we need to send it */
-		struct net_buf_simple buf_copy;
-		net_buf_simple_clone(ad, &buf_copy);
-
-		bt_data_parse(ad, device_found, (void *)&sr_info);
-
-		if (sr_info.has_bass) {
-			LOG_INF("Broadcast Sink Found: [%s]", sr_info.bt_name);
-			LOG_DBG("buf %p, len %d", buf_copy.data, buf_copy.len);
-
-			/* Send the full advertising result */
-
-			// TBD: the netbuf clone is used here
-			msg.type = MESSAGE_TYPE_EVT;
+		return;
+	case BROADCAST_ASSISTANT_STATE_SCAN_SINK:
+		if (scan_for_sink(info, ad)) {
+			/* broadcast sink found */
 			msg.sub_type = MESSAGE_SUBTYPE_SINK_FOUND;
-			msg.seq_no = 0;
-			msg.length = buf_copy.len;
-			memcpy(msg.payload, buf_copy.data, buf_copy.len);
-
-			err = webusb_transmit((uint8_t*)&msg, buf_copy.len + 5);
-			if (err != 0) {
-				LOG_ERR("FAILED TO SEND Sink Found EVT (err=%d)", err);
-			}
-
+			break; /* send message */
 		}
+		return;
+	case BROADCAST_ASSISTANT_STATE_IDLE:
+	default:
+		return;
+	}
+
+	msg.type = MESSAGE_TYPE_EVT;
+	msg.seq_no = 0;
+	msg.length = ad_clone.len;
+	memcpy(msg.payload, ad_clone.data, ad_clone.len);
+
+	err = webusb_transmit((uint8_t *)&msg,
+			      msg.length + offsetof(struct command_message, payload));
+	if (err != 0) {
+		LOG_ERR("Failed to send sink found evt (err=%d)", err);
 	}
 }
 
@@ -243,44 +262,52 @@ static void scan_timeout_cb(void)
 
 void scan_for_broadcast_source(uint8_t seq_no)
 {
-	int err;
-
-	scanning_for_broadcast_source = true;
-
-	err = bt_le_scan_start(BT_LE_SCAN_PASSIVE, NULL);
-	if (err) {
-		LOG_ERR("Scanning failed to start (err %d)\n", err);
-		return;
+	if (ba_state == BROADCAST_ASSISTANT_STATE_IDLE) {
+		int err = bt_le_scan_start(BT_LE_SCAN_PASSIVE, NULL);
+		if (err) {
+			LOG_ERR("Scanning failed to start (err %d)", err);
+			return;
+		}
 	}
 
-	LOG_INF("Scanning for Broadcast Source successfully started");
+	LOG_INF("Scanning for Broadcast Source started");
 	send_response(MESSAGE_SUBTYPE_START_SOURCE_SCAN, seq_no);
+
+	ba_state = BROADCAST_ASSISTANT_STATE_SCAN_SOURCE;
 }
 
 void scan_for_broadcast_sink(uint8_t seq_no)
 {
-	int err;
-
-	scanning_for_broadcast_source = false;
-
-	err = bt_le_scan_start(BT_LE_SCAN_PASSIVE, NULL);
-	if (err) {
-		LOG_ERR("Scanning failed to start (err %d)", err);
-		return;
+	if (ba_state == BROADCAST_ASSISTANT_STATE_IDLE) {
+		int err = bt_le_scan_start(BT_LE_SCAN_PASSIVE, NULL);
+		if (err) {
+			LOG_ERR("Scanning failed to start (err %d)", err);
+			return;
+		}
 	}
 
 	LOG_INF("Scanning for Broadcast Sink started");
 	send_response(MESSAGE_SUBTYPE_START_SINK_SCAN, seq_no);
+
+	ba_state = BROADCAST_ASSISTANT_STATE_SCAN_SINK;
 }
 
 void stop_scanning(uint8_t seq_no)
 {
+	if (ba_state == BROADCAST_ASSISTANT_STATE_IDLE) {
+		/* No scan ongoing */
+		return;
+	}
+
 	int err = bt_le_scan_stop();
 	if (err != 0) {
 		LOG_ERR("bt_le_scan_stop failed with %d", err);
 	}
 
+	LOG_INF("Scanning stopped");
 	send_response(MESSAGE_SUBTYPE_STOP_SCAN, seq_no);
+
+	ba_state = BROADCAST_ASSISTANT_STATE_IDLE;
 }
 
 void broadcast_assistant_init(void)
@@ -295,4 +322,6 @@ void broadcast_assistant_init(void)
 
 	bt_le_scan_cb_register(&scan_callbacks);
 	LOG_INF("Bluetooth scan callback registered");
+
+	ba_state = BROADCAST_ASSISTANT_STATE_IDLE;
 }
