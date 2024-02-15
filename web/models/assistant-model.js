@@ -70,6 +70,7 @@ export class AssistantModel extends EventTarget {
 
 	handleSourceFound(message) {
 		console.log(`Handle found Source`);
+
 		const payloadArray = ltvToArray(message.payload);
 		console.log('Payload', payloadArray);
 
@@ -109,24 +110,6 @@ export class AssistantModel extends EventTarget {
 		const payloadArray = ltvToArray(message.payload);
 		console.log('Payload', payloadArray);
 
-		/* TBD on this block
-		if (!('bt_addr' in scanData)) {
-			console.log('Invalid scan data, no bt_addr present')
-			return;
-		}
-
-		// If existing, just update RSSI, otherwise add to list
-		let sinkDevice = this.#sinks.find(sink => sink.bt_addr === scanData.bt_addr);
-		if (!sinkDevice) {
-			// This is a new element
-			this.#sinks.push(scanData)
-		} else {
-			// This device is already saved, update rssi
-			sinkDevice.rssi = scanData.rssi;
-		}
-		*/
-
-
 		// Find a name and add that (alone) to the sink device
 		// TODO: if sink is already in the list, just update, e.g. RSSI
 		const sink = {
@@ -138,6 +121,14 @@ export class AssistantModel extends EventTarget {
 				BT_DataType.BT_DATA_UUID16_ALL,
 				BT_DataType.BT_DATA_UUID16_SOME,
 			])?.value || []
+		}
+
+		// Add to source device list
+		let sinkInList = this.#sinks.find(_sink => _sink.name === sink.name);
+		if (!sinkInList) {
+			this.#sinks.push(sinkInList)
+		} else {
+			// TODO: This device is already saved, update rssi
 		}
 
 		this.dispatchEvent(new CustomEvent('sink-found', {detail: { sink }}));
