@@ -14,7 +14,9 @@
 #include <zephyr/types.h>
 #include <zephyr/bluetooth/gap.h>
 
-#define BT_DATA_RSSI (BT_DATA_MANUFACTURER_DATA - 1)
+#define BT_DATA_RSSI        (BT_DATA_MANUFACTURER_DATA - 1)
+#define BT_DATA_SID         (BT_DATA_MANUFACTURER_DATA - 2)
+#define BT_DATA_PA_INTERVAL (BT_DATA_MANUFACTURER_DATA - 3)
 
 void scan_for_broadcast_source(uint8_t seq_no);
 void scan_for_broadcast_sink(uint8_t seq_no);
