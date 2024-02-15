@@ -97,11 +97,13 @@ export class AssistantModel extends EventTarget {
 			name: ltvArrayFindValue(payloadArray, [
 				BT_DataType.BT_DATA_NAME_SHORTENED,
 				BT_DataType.BT_DATA_NAME_COMPLETE
-			])?.value
+			])?.value || "UNKNOWN",
+			broadcast_name: ltvArrayFindValue(payloadArray, [
+				BT_DataType.BT_DATA_BROADCAST_NAME
+			])?.value || "Unknown Broadcast"
 		}
 
 		this.dispatchEvent(new CustomEvent('source-found', {detail: { source }}));
-
 	}
 
 	handleSinkFound(message) {
