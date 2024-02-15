@@ -21,6 +21,8 @@
 
 LOG_MODULE_REGISTER(broadcast_assistant, LOG_LEVEL_INF);
 
+/*#define BROADCAST_ASSISTANT_DEBUG*/
+
 #define BT_NAME_LEN 30
 #define INVALID_BROADCAST_ID 0xFFFFFFFFU
 
@@ -154,11 +156,8 @@ static bool scan_for_source(const struct bt_le_scan_recv_info *info, struct net_
 
 	/* We are only interested in non-connectable periodic advertisers */
 	if ((info->adv_props & BT_GAP_ADV_PROP_CONNECTABLE) != 0 || info->interval == 0) {
-		LOG_DBG("Connectable...");
 		return false;
 	}
-
-	LOG_DBG("Maybe broadcast...");
 
 	bt_data_parse(ad, device_found, (void *)&sr_info);
 
@@ -214,8 +213,6 @@ static void scan_recv_cb(const struct bt_le_scan_recv_info *info, struct net_buf
 	struct command_message msg;
 	struct net_buf_simple ad_clone;
 
-	LOG_DBG("scan cb...");
-
 	/* For now, just make a copy if we need to send it */
 	net_buf_simple_clone(ad, &ad_clone);
 
@@ -243,6 +240,57 @@ static void scan_recv_cb(const struct bt_le_scan_recv_info *info, struct net_buf
 	msg.seq_no = 0;
 	msg.length = ad_clone.len;
 	memcpy(msg.payload, ad_clone.data, ad_clone.len);
+
+	/* Append data from struct bt_le_scan_recv_info (RSSI, BT addr, ..) */
+	/* RSSI */
+	msg.payload[msg.length++] = 2;
+	msg.payload[msg.length++] = BT_DATA_RSSI;
+	msg.payload[msg.length++] = info->rssi;
+	/* bt_addr_le */
+	if (info->addr->type == BT_ADDR_LE_PUBLIC) {
+		msg.payload[msg.length++] = 1 + BT_ADDR_SIZE;
+		msg.payload[msg.length++] = BT_DATA_PUB_TARGET_ADDR;
+		memcpy(&msg.payload[msg.length], &info->addr->a, sizeof(bt_addr_t));
+		msg.length += sizeof(bt_addr_t);
+
+	} else if (info->addr->type == BT_ADDR_LE_RANDOM) {
+		msg.payload[msg.length++] = 1 + BT_ADDR_SIZE;
+		msg.payload[msg.length++] = BT_DATA_RAND_TARGET_ADDR;
+		memcpy(&msg.payload[msg.length], &info->addr->a, sizeof(bt_addr_t));
+		msg.length += sizeof(bt_addr_t);
+	}
+
+#ifdef BROADCAST_ASSISTANT_DEBUG
+	char log_str[256] = {0};
+	uint8_t *payload_ptr = &msg.payload[0];
+
+	/* Show message payload */
+	for (int i = 0; i < msg.length;) {
+		uint8_t len = *payload_ptr++;
+		char *ch_ptr = &log_str[0];
+
+		/* length */
+		sprintf(ch_ptr, "[ L:%02x ", len);
+		ch_ptr += 7;
+		if (len > 0) {
+			/* type */
+			sprintf(ch_ptr, "T:%02x ", *payload_ptr++);
+			ch_ptr += 5;
+			if (len > 1) {
+				/* value */
+				for (int j = 1; j < len; j++) {
+					sprintf(ch_ptr, "%02x ", *payload_ptr++);
+					ch_ptr += 3;
+				}
+			}
+		}
+		sprintf(ch_ptr, "]");
+		ch_ptr += 1;
+		i += (len + 1);
+
+		LOG_DBG("%s", log_str);
+	}
+#endif /* BROADCAST_ASSISTANT_DEBUG */
 
 	err = webusb_transmit((uint8_t *)&msg,
 			      msg.length + offsetof(struct command_message, payload));
