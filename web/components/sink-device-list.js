@@ -80,6 +80,22 @@ export class SinkDeviceList extends HTMLElement {
 		console.log('EVT', evt);
 
 		// Just use the name for now... ignore duplicates...
+		var elements = this.#list.querySelectorAll('sink-item');
+		var sinkExists = false;
+		elements.forEach( e => {
+			var sinkName = e.shadowRoot.getElementById('name')?.textContent
+			if (sinkName === sink.name) {
+				sinkExists = true;
+				return;
+			}
+		})
+
+		// TODO: Update RSSI before returning
+		if (sinkExists) {
+			return;
+		}
+
+		// Just use the name for now... ignore duplicates...
 		const el = document.createElement('sink-item');
 		this.#list.appendChild(el);
 		el.setModel(sink);
