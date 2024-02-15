@@ -88,7 +88,7 @@ export class SinkDeviceList extends HTMLElement {
 				sinkExists = true;
 				return;
 			}
-		})
+		});
 
 		// TODO: Update RSSI before returning
 		if (sinkExists) {

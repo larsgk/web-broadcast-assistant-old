@@ -84,7 +84,7 @@ export class SourceItem extends HTMLElement {
 		this.#uuid16sEl.textContent = `UUID16s: [${this.#source.uuid16s?.map(
 			a => {return '0x'+a.toString(16)}
 			)} ]`;
-		}
 	}
-	customElements.define('source-item', SourceItem);
+}
+customElements.define('source-item', SourceItem);
 	
