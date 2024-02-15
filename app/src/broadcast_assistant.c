@@ -259,6 +259,15 @@ static void scan_recv_cb(const struct bt_le_scan_recv_info *info, struct net_buf
 		memcpy(&msg.payload[msg.length], &info->addr->a, sizeof(bt_addr_t));
 		msg.length += sizeof(bt_addr_t);
 	}
+	if (ba_state == BROADCAST_ASSISTANT_STATE_SCAN_SOURCE) {
+		msg.payload[msg.length++] = 2;
+		msg.payload[msg.length++] = BT_DATA_SID;
+		msg.payload[msg.length++] = info->sid;
+		msg.payload[msg.length++] = 3;
+		msg.payload[msg.length++] = BT_DATA_PA_INTERVAL;
+		sys_put_le16(info->interval, &msg.payload[msg.length]);
+		msg.length += 2;
+	}
 
 #ifdef BROADCAST_ASSISTANT_DEBUG
 	char log_str[256] = {0};
