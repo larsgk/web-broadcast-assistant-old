@@ -222,10 +222,8 @@ const parseLTVItem = (type, len, value) => {
 		item.value = bufToValueArray(value, 4);
 		break;
 		case BT_DataType.BT_DATA_PUB_TARGET_ADDR:
-		item.value = bufToAddressString(value)
-		break;
 		case BT_DataType.BT_DATA_RAND_TARGET_ADDR:
-		item.value = `${bufToAddressString(value)} (random)`
+		item.value = bufToAddressString(value)
 		break;
 		case BT_DataType.BT_DATA_RSSI:
 		item.value = bufToInt8Array(value);

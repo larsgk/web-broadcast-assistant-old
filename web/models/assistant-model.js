@@ -86,6 +86,10 @@ export class AssistantModel extends EventTarget {
 				BT_DataType.BT_DATA_PUB_TARGET_ADDR,
 				BT_DataType.BT_DATA_RAND_TARGET_ADDR
 			])?.value || "Unknown Address",
+			uuid16s: ltvArrayFindValue(payloadArray, [
+				BT_DataType.BT_DATA_UUID16_ALL,
+				BT_DataType.BT_DATA_UUID16_SOME,
+			])?.value || [],
 			rssi: ltvArrayFindValue(payloadArray, [
 				BT_DataType.BT_DATA_RSSI
 			])?.value || "Unknown RSSI"
@@ -117,18 +121,25 @@ export class AssistantModel extends EventTarget {
 				BT_DataType.BT_DATA_NAME_SHORTENED,
 				BT_DataType.BT_DATA_NAME_COMPLETE
 			])?.value || "UNKNOWN",
+			addr: ltvArrayFindValue(payloadArray, [
+				BT_DataType.BT_DATA_PUB_TARGET_ADDR,
+				BT_DataType.BT_DATA_RAND_TARGET_ADDR
+			])?.value || "Unknown Address",
 			uuid16s: ltvArrayFindValue(payloadArray, [
 				BT_DataType.BT_DATA_UUID16_ALL,
 				BT_DataType.BT_DATA_UUID16_SOME,
-			])?.value || []
+			])?.value || [],
+			rssi: ltvArrayFindValue(payloadArray, [
+				BT_DataType.BT_DATA_RSSI
+			])?.value || "Unknown RSSI"
 		}
 
-		// Add to source device list
-		let sinkInList = this.#sinks.find(_sink => _sink.name === sink.name);
-		if (!sinkInList) {
-			this.#sinks.push(sinkInList)
+		// If device already exists, just update RSSI, otherwise add to list
+		let device = this.#sinks.find(_sink => _sink.name === sink.name);
+		if (!device) {
+			this.#sinks.push(sink)
 		} else {
-			// TODO: This device is already saved, update rssi
+			device.rssi = sink.rssi;
 		}
 
 		this.dispatchEvent(new CustomEvent('sink-found', {detail: { sink }}));

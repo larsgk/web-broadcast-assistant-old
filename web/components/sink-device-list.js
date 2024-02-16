@@ -99,6 +99,24 @@ export class SinkDeviceList extends HTMLElement {
 		const el = document.createElement('sink-item');
 		this.#list.appendChild(el);
 		el.setModel(sink);
+
+		// For now, just some simple green selector color. Only one can be selected at a time
+		el.addEventListener('click', () => {
+			var elements = this.#list.querySelectorAll('sink-item');
+			elements.forEach( _el => {
+				if (_el.isSameNode(el)) {
+					const { selectedSource } = _el;
+					this.dispatchEvent(new CustomEvent('sink-selected', {detail: { selectedSource }}));
+
+					_el.style.backgroundColor = "green";
+				} else {
+					_el.style.backgroundColor = "white";
+				}
+			});
+
+			// TODO: If element was clicked, send event to model, so that model
+			// can tell USB to let connected sinks sync to the Broadcast Source
+		});
 	}
 }
 customElements.define('sink-device-list', SinkDeviceList);
