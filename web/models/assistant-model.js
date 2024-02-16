@@ -74,25 +74,6 @@ export class AssistantModel extends EventTarget {
 		const payloadArray = ltvToArray(message.payload);
 		console.log('Payload', payloadArray);
 
-		/* TBD on this block
-		let scanData = parseLTV(data)
-
-		if (!('broadcast_id' in scanData)) {
-			console.log('Invalid scan data, no broadcast_id present')
-			return;
-		}
-
-		// If existing, just update RSSI, otherwise add to list
-		let sourceDevice = this.#sources.find(sink => sink.broadcast_id === scanData.broadcast_id);
-		if (!sourceDevice) {
-			// This is a new element
-			this.#sources.push(scanData)
-		} else {
-			// This device is already saved, update rssi
-			sourceDevice.rssi = scanData.rssi;
-		}
-		*/
-
 		const source = {
 			name: ltvArrayFindValue(payloadArray, [
 				BT_DataType.BT_DATA_NAME_SHORTENED,
@@ -100,7 +81,20 @@ export class AssistantModel extends EventTarget {
 			])?.value || "UNKNOWN",
 			broadcast_name: ltvArrayFindValue(payloadArray, [
 				BT_DataType.BT_DATA_BROADCAST_NAME
-			])?.value || "Unknown Broadcast"
+			])?.value || "Unknown Broadcast",
+			rssi: ltvArrayFindValue(payloadArray, [
+				BT_DataType.BT_DATA_RSSI
+			])?.value || "Unknown RSSI"
+		}
+
+		// If device already exists, just update RSSI, otherwise add to list
+		let device = this.#sources.find(_source => _source.broadcast_id === _source.broadcast_name);
+		if (!device) {
+			// This is a new element
+			this.#sources.push(source)
+		} else {
+			// This device is already saved, update rssi
+			device.rssi = source.rssi;
 		}
 
 		this.dispatchEvent(new CustomEvent('source-found', {detail: { source }}));
