@@ -79,19 +79,21 @@ export class SourceDeviceList extends HTMLElement {
 
 		console.log('EVT', evt);
 
-		// Just use the name for now... ignore duplicates...
-		var elements = this.#list.querySelectorAll('source-item');
-		var sourceExists = false;
+		// TODO: Change check to address - just use the name for now ... ignore duplicates...
+		const elements = this.#list.querySelectorAll('source-item');
+		let _source = null;
 		elements.forEach( e => {
 			var sourceName = e.shadowRoot.getElementById('name')?.textContent
 			if (sourceName === source.name) {
-				sourceExists = true;
+				_source = e;
 				return;
 			}
 		});
+		console.log(_source);
 
 		// TODO: Update RSSI before returning
-		if (sourceExists) {
+		if (_source) {
+			_source.setModel(source);
 			return;
 		}
 
@@ -104,6 +106,9 @@ export class SourceDeviceList extends HTMLElement {
 			var elements = this.#list.querySelectorAll('source-item');
 			elements.forEach( _el => {
 				if (_el.isSameNode(el)) {
+					const { selectedSource } = _el;
+					this.dispatchEvent(new CustomEvent('source-selected', {detail: { selectedSource }}));
+
 					_el.style.backgroundColor = "green";
 				} else {
 					_el.style.backgroundColor = "white";

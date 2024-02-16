@@ -49,6 +49,8 @@ export const BT_DataType = Object.freeze({
 	BT_DATA_SVC_DATA16:		0x16,
 
 	BT_DATA_BROADCAST_NAME:		0x30,
+
+	BT_DATA_RSSI:			0xfe,
 });
 
 export const BT_UUID = Object.freeze({
@@ -141,6 +143,17 @@ export const arrayToMsg = data => {
 
 const utf8decoder = new TextDecoder();
 
+const bufToInt8Array = (data) => {
+	const res = [];
+
+	for (var i = 0; i < data.length; i++) {
+		var intSign = data[i] & (1 << 7);
+		res[i] = (data[i] & 0x7f) * (intSign !== 0 ? -1 : 1);
+	}
+
+	return res;
+}
+
 const bufToValueArray = (data, itemsize) => {
 	// Used to extract uint8, 16, 24 or 32 values
 	if (!(data instanceof Uint8Array)) {
@@ -194,6 +207,9 @@ const parseLTVItem = (type, len, value) => {
 		case BT_DataType.BT_DATA_UUID32_SOME:
 		case BT_DataType.BT_DATA_UUID32_ALL:
 		item.value = bufToValueArray(value, 4);
+		break;
+		case BT_DataType.BT_DATA_RSSI:
+		item.value = bufToInt8Array(value);
 		break;
 		default:
 		item.value = "UNHANDLED";
