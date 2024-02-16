@@ -82,6 +82,10 @@ export class AssistantModel extends EventTarget {
 			broadcast_name: ltvArrayFindValue(payloadArray, [
 				BT_DataType.BT_DATA_BROADCAST_NAME
 			])?.value || "Unknown Broadcast",
+			addr: ltvArrayFindValue(payloadArray, [
+				BT_DataType.BT_DATA_PUB_TARGET_ADDR,
+				BT_DataType.BT_DATA_RAND_TARGET_ADDR
+			])?.value || "Unknown Address",
 			rssi: ltvArrayFindValue(payloadArray, [
 				BT_DataType.BT_DATA_RSSI
 			])?.value || "Unknown RSSI"

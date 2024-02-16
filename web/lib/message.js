@@ -48,6 +48,9 @@ export const BT_DataType = Object.freeze({
 
 	BT_DATA_SVC_DATA16:		0x16,
 
+	BT_DATA_PUB_TARGET_ADDR:	0x17,
+	BT_DATA_RAND_TARGET_ADDR:	0x18,
+
 	BT_DATA_BROADCAST_NAME:		0x30,
 
 	BT_DATA_RSSI:			0xfe,
@@ -143,6 +146,16 @@ export const arrayToMsg = data => {
 
 const utf8decoder = new TextDecoder();
 
+const bufToAddressString = (data) => {
+	if (data.length != 6) {
+		return `UNKNOWN ADDRESS`
+	}
+
+	return Array.from(data, byte => {
+		return ('0' + (byte & 0xFF).toString(16)).slice(-2);
+	}).join(':')
+}
+
 const bufToInt8Array = (data) => {
 	const res = [];
 
@@ -207,6 +220,12 @@ const parseLTVItem = (type, len, value) => {
 		case BT_DataType.BT_DATA_UUID32_SOME:
 		case BT_DataType.BT_DATA_UUID32_ALL:
 		item.value = bufToValueArray(value, 4);
+		break;
+		case BT_DataType.BT_DATA_PUB_TARGET_ADDR:
+		item.value = bufToAddressString(value)
+		break;
+		case BT_DataType.BT_DATA_RAND_TARGET_ADDR:
+		item.value = `${bufToAddressString(value)} (random)`
 		break;
 		case BT_DataType.BT_DATA_RSSI:
 		item.value = bufToInt8Array(value);

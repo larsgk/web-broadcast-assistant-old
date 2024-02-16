@@ -34,6 +34,13 @@ div {
 	font-size: 1.2em;
 }
 
+#addr {
+	position: absolute;
+	left: 5px;
+	top: 30px;
+	font-size: 0.9em;
+}
+
 #broadcast_name {
 	position: absolute;
 	top: 5px;
@@ -58,6 +65,7 @@ div {
 <div>
 <span id="name"></span>
 <span id="broadcast_name"></span>
+<span id="addr"></span>
 <span id="uuid16s"></span>
 <span id="rssi"></span>
 </div>
@@ -67,8 +75,9 @@ export class SourceItem extends HTMLElement {
 	#source
 	#nameEl
 	#broadcastNameEl
+	#addrEl
 	#uuid16sEl
-	#rssi
+	#rssiEl
 	
 	constructor() {
 		super();
@@ -80,8 +89,9 @@ export class SourceItem extends HTMLElement {
 	connectedCallback() {
 		this.#nameEl = this.shadowRoot?.querySelector('#name');
 		this.#broadcastNameEl = this.shadowRoot?.querySelector('#broadcast_name');
+		this.#addrEl = this.shadowRoot?.querySelector('#addr');
 		this.#uuid16sEl = this.shadowRoot?.querySelector('#uuid16s');
-		this.#rssi = this.shadowRoot?.querySelector('#rssi');
+		this.#rssiEl = this.shadowRoot?.querySelector('#rssi');
 	}
 	
 	setModel(source) {
@@ -90,7 +100,8 @@ export class SourceItem extends HTMLElement {
 		// Set name (and more...)
 		this.#nameEl.textContent = this.#source.name;
 		this.#broadcastNameEl.textContent = this.#source.broadcast_name;
-		this.#rssi.textContent = `RSSI: ${this.#source.rssi}`;
+		this.#addrEl.textContent = this.#source.addr;
+		this.#rssiEl.textContent = `RSSI: ${this.#source.rssi}`;
 
 		this.#uuid16sEl.textContent = `UUID16s: [${this.#source.uuid16s?.map(
 			a => {return '0x'+a.toString(16)}
