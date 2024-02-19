@@ -92,7 +92,7 @@ export class AssistantModel extends EventTarget {
 		// TODO: Handle Broadcast ID parsing in message.js and attach to 'source'
 
 		// If device already exists, just update RSSI, otherwise add to list
-		let source = this.#sources.find(i => i.addr === addr);
+		let source = this.#sources.find(i => i.addr.value === addr.value);
 		if (!source) {
 			source = {
 				addr,
@@ -272,6 +272,7 @@ export const initializeAssistantModel = deviceService => {
 	if (!_instance) {
 		_instance = new AssistantModel(deviceService);
 	}
+	return _instance;
 }
 
 export const getInstance = () => {
