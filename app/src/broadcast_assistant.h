@@ -17,10 +17,12 @@
 #define BT_DATA_RSSI        (BT_DATA_MANUFACTURER_DATA - 1)
 #define BT_DATA_SID         (BT_DATA_MANUFACTURER_DATA - 2)
 #define BT_DATA_PA_INTERVAL (BT_DATA_MANUFACTURER_DATA - 3)
+#define BT_DATA_ERROR_CODE  (BT_DATA_MANUFACTURER_DATA - 4)
 
-void scan_for_broadcast_source(uint8_t seq_no);
-void scan_for_broadcast_sink(uint8_t seq_no);
-void stop_scanning(uint8_t seq_no);
-void broadcast_assistant_init(void);
+int scan_for_broadcast_source(uint8_t seq_no);
+int scan_for_broadcast_sink(uint8_t seq_no);
+int stop_scanning(uint8_t seq_no);
+int connect_to_sink(uint8_t seq_no, uint16_t msg_length, uint8_t *payload);
+int broadcast_assistant_init(void);
 
 #endif /* __BROADCAST_ASSISTANT_H__ */

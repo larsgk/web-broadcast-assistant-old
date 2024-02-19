@@ -20,7 +20,7 @@ LOG_MODULE_REGISTER(webusb, LOG_LEVEL_ERR);
 #include <zephyr/usb/usb_device.h>
 #include <usb_descriptor.h>
 
-#include "command.h"
+#include "message_handler.h"
 #include "webusb.h"
 #include "cobs.h"
 #include "msosv2.h"
@@ -43,7 +43,7 @@ LOG_MODULE_REGISTER(webusb, LOG_LEVEL_ERR);
 #define WEBUSB_WORKQUEUE_STACK_SIZE 2048
 #define WEBUSB_WORKQUEUE_PRIORITY K_PRIO_PREEMPT(1)
 
-void (*webusb_cmd_handler)(struct command_message *command_ptr, uint16_t command_length);
+void (*webusb_msg_handler)(struct webusb_message *msg_ptr, uint16_t msg_length);
 
 #define MAX_COBS_MESSAGE_SIZE COBS_ENCODE_DST_BUF_LEN_MAX(CONFIG_WEBUSB_APPLICATION_TX_MAX_PAYLOAD_SIZE)
 
@@ -175,8 +175,8 @@ static void webusb_rx_work_handler(struct k_work *work_p)
 {
 	ARG_UNUSED(work_p);
 
-	if (webusb_cmd_handler) {
-		webusb_cmd_handler((struct command_message *)&cobs_decoded_stream, cobs_decoded_length);
+	if (webusb_msg_handler) {
+		webusb_msg_handler((struct webusb_message *)&cobs_decoded_stream, cobs_decoded_length);
 	}
 }
 
@@ -212,11 +212,11 @@ static void webusb_tx_work_handler(struct k_work *work_p)
  *
  * @param [in] handlers Pointer to WebUSB command handler structure
  */
-void webusb_register_command_handler(void (*cb)(struct command_message *command_ptr, uint16_t command_length))
+void webusb_register_message_handler(void (*cb)(struct webusb_message *msg_ptr,
+						uint16_t msg_length))
 {
-	webusb_cmd_handler = cb;
+	webusb_msg_handler = cb;
 }
-
 
 static void webusb_read_cb(uint8_t ep, int size, void *priv)
 {

@@ -26,6 +26,7 @@ enum message_sub_type {
 	MESSAGE_SUBTYPE_START_SINK_SCAN   = 0x01,
 	MESSAGE_SUBTYPE_START_SOURCE_SCAN = 0x02,
 	MESSAGE_SUBTYPE_STOP_SCAN         = 0x03,
+	MESSAGE_SUBTYPE_CONNECT_SINK      = 0x04,
 
 	MESSAGE_SUBTYPE_DUMMY             = 0x7F,
 
@@ -36,7 +37,7 @@ enum message_sub_type {
 	MESSAGE_SUBTYPE_HEARTBEAT         = 0xFF,
 };
 
-struct command_message {
+struct webusb_message {
 	uint8_t type;
 	uint8_t sub_type;
 	uint8_t seq_no;
@@ -44,11 +45,7 @@ struct command_message {
 	uint8_t payload[MAX_MSG_PAYLOAD_LEN];
 } __packed;
 
-void send_ok_response(void);
-void send_dummy_response(uint8_t seq_no);
-void send_response(enum message_sub_type type, uint8_t seq_no);
-void send_error_response(void);
-void command_handler(struct command_message *command_ptr, uint16_t command_length);
-void command_init(void);
+void message_handler(struct webusb_message *msg_ptr, uint16_t msg_length);
+void message_handler_init(void);
 
 #endif /* __COMMAND_H__ */
