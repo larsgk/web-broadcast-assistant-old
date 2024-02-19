@@ -47,7 +47,7 @@ div {
 	font-size: 1.2em;
 }
 
-#uuid16s {
+#broadcast_id {
 	position: absolute;
 	left: 5px;
 	bottom: 5px;
@@ -66,7 +66,7 @@ div {
 <span id="name"></span>
 <span id="broadcast_name"></span>
 <span id="addr"></span>
-<span id="uuid16s"></span>
+<span id="broadcast_id"></span>
 <span id="rssi"></span>
 </div>
 `;
@@ -76,12 +76,15 @@ export class SourceItem extends HTMLElement {
 	#nameEl
 	#broadcastNameEl
 	#addrEl
-	#uuid16sEl
+	#broadcastIdEl
 	#rssiEl
-	
+
 	constructor() {
 		super();
-		
+
+		this.setModel = this.setModel.bind(this);
+                this.refresh = this.refresh.bind(this);
+
 		const shadowRoot = this.attachShadow({mode: 'open'});
 		shadowRoot.appendChild(template.content.cloneNode(true));
 	}
@@ -90,23 +93,28 @@ export class SourceItem extends HTMLElement {
 		this.#nameEl = this.shadowRoot?.querySelector('#name');
 		this.#broadcastNameEl = this.shadowRoot?.querySelector('#broadcast_name');
 		this.#addrEl = this.shadowRoot?.querySelector('#addr');
-		this.#uuid16sEl = this.shadowRoot?.querySelector('#uuid16s');
+		this.#broadcastIdEl = this.shadowRoot?.querySelector('#broadcast_id');
 		this.#rssiEl = this.shadowRoot?.querySelector('#rssi');
 	}
-	
-	setModel(source) {
-		this.#source = source;
 
+	refresh() {
 		// Set name (and more...)
 		this.#nameEl.textContent = this.#source.name;
 		this.#broadcastNameEl.textContent = this.#source.broadcast_name;
 		this.#addrEl.textContent = this.#source.addr;
 		this.#rssiEl.textContent = `RSSI: ${this.#source.rssi}`;
 
-		this.#uuid16sEl.textContent = `UUID16s: [${this.#source.uuid16s?.map(
-			a => {return '0x'+a.toString(16)}
-			)} ]`;
+		this.#broadcastIdEl.textContent = `Broadcast ID: 0x${this.#source.broadcastId}`;
+	}
+
+	setModel(source) {
+		this.#source = source;
+
+		this.refresh();
+	}
+
+	getModel() {
+		return this.#source;
 	}
 }
 customElements.define('source-item', SourceItem);
-	

@@ -72,85 +72,98 @@ export class AssistantModel extends EventTarget {
 		console.log(`Handle found Source`);
 
 		const payloadArray = ltvToArray(message.payload);
-		console.log('Payload', payloadArray);
+		// console.log('Payload', payloadArray);
 
-		const source = {
-			name: ltvArrayFindValue(payloadArray, [
-				BT_DataType.BT_DATA_NAME_SHORTENED,
-				BT_DataType.BT_DATA_NAME_COMPLETE
-			])?.value || "UNKNOWN",
-			broadcast_name: ltvArrayFindValue(payloadArray, [
-				BT_DataType.BT_DATA_BROADCAST_NAME
-			])?.value || "Unknown Broadcast",
-			addr: ltvArrayFindValue(payloadArray, [
-				BT_DataType.BT_DATA_PUB_TARGET_ADDR,
-				BT_DataType.BT_DATA_RAND_TARGET_ADDR
-			])?.value || "Unknown Address",
-			uuid16s: ltvArrayFindValue(payloadArray, [
-				BT_DataType.BT_DATA_UUID16_ALL,
-				BT_DataType.BT_DATA_UUID16_SOME,
-			])?.value || [],
-			rssi: ltvArrayFindValue(payloadArray, [
-				BT_DataType.BT_DATA_RSSI
-			])?.value || "Unknown RSSI"
+		const addr = ltvArrayFindValue(payloadArray, [
+			BT_DataType.BT_DATA_PUB_TARGET_ADDR,
+			BT_DataType.BT_DATA_RAND_TARGET_ADDR
+		])?.value;
+
+		if (!addr) {
+			// TBD: Throw exception?
+			return;
 		}
+
+		const rssi = ltvArrayFindValue(payloadArray, [
+			BT_DataType.BT_DATA_RSSI
+		])?.value;
+
+		// TODO: Handle Broadcast ID parsing in message.js and attach to 'source'
 
 		// If device already exists, just update RSSI, otherwise add to list
-		let device = this.#sources.find(_source => _source.broadcast_id === _source.broadcast_name);
-		if (!device) {
-			// This is a new element
-			this.#sources.push(source)
-		} else {
-			// This device is already saved, update rssi
-			device.rssi = source.rssi;
-		}
+		let source = this.#sources.find(i => i.addr === addr);
+		if (!source) {
+			source = {
+				addr,
+				rssi,
+				name: ltvArrayFindValue(payloadArray, [
+					BT_DataType.BT_DATA_NAME_SHORTENED,
+					BT_DataType.BT_DATA_NAME_COMPLETE
+				])?.value,
+				broadcast_name: ltvArrayFindValue(payloadArray, [
+					BT_DataType.BT_DATA_BROADCAST_NAME
+				])?.value
+			}
 
-		this.dispatchEvent(new CustomEvent('source-found', {detail: { source }}));
+			this.#sources.push(source)
+			this.dispatchEvent(new CustomEvent('source-found', {detail: { source }}));
+		} else {
+			console.log(`source rssi updated ${source.rssi} -> ${rssi}`)
+			source.rssi = rssi;
+			this.dispatchEvent(new CustomEvent('source-updated', {detail: { source }}));
+		}
 	}
 
 	handleSinkFound(message) {
 		console.log(`Handle found Sink`);
 
 		const payloadArray = ltvToArray(message.payload);
-		console.log('Payload', payloadArray);
+		// console.log('Payload', payloadArray);
 
-		// Find a name and add that (alone) to the sink device
-		// TODO: if sink is already in the list, just update, e.g. RSSI
-		const sink = {
-			name: ltvArrayFindValue(payloadArray, [
-				BT_DataType.BT_DATA_NAME_SHORTENED,
-				BT_DataType.BT_DATA_NAME_COMPLETE
-			])?.value || "UNKNOWN",
-			addr: ltvArrayFindValue(payloadArray, [
-				BT_DataType.BT_DATA_PUB_TARGET_ADDR,
-				BT_DataType.BT_DATA_RAND_TARGET_ADDR
-			])?.value || "Unknown Address",
-			uuid16s: ltvArrayFindValue(payloadArray, [
-				BT_DataType.BT_DATA_UUID16_ALL,
-				BT_DataType.BT_DATA_UUID16_SOME,
-			])?.value || [],
-			rssi: ltvArrayFindValue(payloadArray, [
-				BT_DataType.BT_DATA_RSSI
-			])?.value || "Unknown RSSI"
+		const addr = ltvArrayFindValue(payloadArray, [
+			BT_DataType.BT_DATA_PUB_TARGET_ADDR,
+			BT_DataType.BT_DATA_RAND_TARGET_ADDR
+		])?.value;
+
+		if (!addr) {
+			// TBD: Throw exception?
+			return;
 		}
+
+		const rssi = ltvArrayFindValue(payloadArray, [
+			BT_DataType.BT_DATA_RSSI
+		])?.value;
 
 		// If device already exists, just update RSSI, otherwise add to list
-		let device = this.#sinks.find(_sink => _sink.name === sink.name);
-		if (!device) {
-			this.#sinks.push(sink)
-		} else {
-			device.rssi = sink.rssi;
-		}
+		let sink = this.#sinks.find(i => i.addr === addr);
+		if (!sink) {
+			sink = {
+				addr,
+				rssi,
+				name: ltvArrayFindValue(payloadArray, [
+					BT_DataType.BT_DATA_NAME_SHORTENED,
+					BT_DataType.BT_DATA_NAME_COMPLETE
+				])?.value,
+				uuid16s: ltvArrayFindValue(payloadArray, [
+					BT_DataType.BT_DATA_UUID16_ALL,
+					BT_DataType.BT_DATA_UUID16_SOME,
+				])?.value || []
+			}
 
-		this.dispatchEvent(new CustomEvent('sink-found', {detail: { sink }}));
+			this.#sinks.push(sink)
+			this.dispatchEvent(new CustomEvent('sink-found', {detail: { sink }}));
+		} else {
+			sink.rssi = rssi;
+			this.dispatchEvent(new CustomEvent('sink-updated', {detail: { sink }}));
+		}
 	}
 
 	handleRES(msg) {
-		console.log(`Response message ${msg.type}`);
+		console.log(`Response message 0x${msg.type.toString(16)}`);
 	}
 
 	handleEVT(message) {
-		console.log(`Event with subType ${message.subType}`);
+		console.log(`Event with subType 0x${message.subType.toString(16)}`);
 
 		switch (message.subType) {
 			case MessageSubType.SINK_FOUND:
@@ -160,7 +173,7 @@ export class AssistantModel extends EventTarget {
 			this.handleSourceFound(message);
 			break;
 			default:
-			console.log(`Could not interpret event with subType ${message.subType}`);
+			console.log(`Missing handler for subType 0x${message.subType.toString(16)}`);
 		}
 	}
 
