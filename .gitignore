@@ -1,1 +1,7 @@
 build*
+.venv
+.west
+.vscode
+bootloader
+tools
+modules

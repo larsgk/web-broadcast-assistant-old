@@ -1,11 +1,11 @@
 mainmenu "WebUSB Broadcast Assistant"
 
-config WEBUSB_TX_MSG_QUEUE_SIZE
-	int "The number of elements in the WebUSB Transmit Message Queue"
+config TX_MSG_MAX_MESSAGES
+	int "The maximum number of elements in the transmit pipeline"
 	default 4
 
-config WEBUSB_APPLICATION_TX_MAX_PAYLOAD_SIZE
-	int "The maximum size of the payload being received by and transmitted by the application"
+config TX_MSG_MAX_PAYLOAD_LEN
+	int "The maximum payload size of a message in the transmit pipeline"
 	default 1024
 
 source "Kconfig.zephyr"

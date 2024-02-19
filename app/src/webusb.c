@@ -45,7 +45,7 @@ LOG_MODULE_REGISTER(webusb, LOG_LEVEL_ERR);
 
 void (*webusb_msg_handler)(struct webusb_message *msg_ptr, uint16_t msg_length);
 
-#define MAX_COBS_MESSAGE_SIZE COBS_ENCODE_DST_BUF_LEN_MAX(CONFIG_WEBUSB_APPLICATION_TX_MAX_PAYLOAD_SIZE)
+#define MAX_COBS_MESSAGE_SIZE COBS_ENCODE_DST_BUF_LEN_MAX(CONFIG_TX_MSG_MAX_PAYLOAD_LEN)
 
 uint8_t rx_buf[MAX_COBS_MESSAGE_SIZE];
 
@@ -96,12 +96,6 @@ static struct usb_ep_cfg_data webusb_ep_data[] = {
 	}
 };
 
-
-typedef struct {
-	uint16_t size;
-	uint8_t data[CONFIG_WEBUSB_APPLICATION_TX_MAX_PAYLOAD_SIZE];
-} webusb_tx_msg_t;
-
 struct k_work_q webusb_workqueue;
 K_THREAD_STACK_DEFINE(webusb_workqueue_stack, WEBUSB_WORKQUEUE_STACK_SIZE);
 
@@ -109,7 +103,7 @@ static void webusb_rx_work_handler(struct k_work *work_p);
 K_WORK_DEFINE(webusb_rx_work, webusb_rx_work_handler);
 static void webusb_tx_work_handler(struct k_work *work_p);
 K_WORK_DEFINE(webusb_tx_work, webusb_tx_work_handler);
-K_MSGQ_DEFINE(webusb_tx_msg_queue, sizeof(webusb_tx_msg_t), 20, 4);
+K_MSGQ_DEFINE(webusb_tx_msg_queue, sizeof(struct net_buf*), CONFIG_TX_MSG_MAX_MESSAGES, 4);
 
 uint8_t cobs_decoded_stream[MAX_COBS_MESSAGE_SIZE];
 uint16_t cobs_decoded_length;
@@ -140,25 +134,22 @@ void webusb_init(void)
 	k_thread_name_set(&webusb_workqueue.thread, "webusbworker");
 }
 
-int webusb_transmit(uint8_t *data, uint16_t size)
+int webusb_transmit(struct net_buf *tx_net_buf)
 {
-	webusb_tx_msg_t tx_msg;
 	int ret;
 
-	LOG_DBG("Preparing to send data (len=%d)", size);
+	LOG_DBG("Preparing to send message (size=%d)", tx_net_buf->len);
 #ifdef WEBUSB_DEBUG
-	print_hex(data, size);
+	print_hex(tx_net_buf->data, tx_net_buf->len);
 #endif /* WEBUSB_DEBUG */
-	if (size > CONFIG_WEBUSB_APPLICATION_TX_MAX_PAYLOAD_SIZE) {
+	if (tx_net_buf->len > sizeof(struct webusb_message) + CONFIG_TX_MSG_MAX_PAYLOAD_LEN) {
 		return -EINVAL;
 	}
 
-	memcpy(tx_msg.data, data, size);
-	tx_msg.size = size;
-
 	LOG_DBG("Trying to put message on queue");
 
-	ret = k_msgq_put(&webusb_tx_msg_queue, &tx_msg, K_NO_WAIT);
+	ret = k_msgq_put(&webusb_tx_msg_queue, &tx_net_buf, K_NO_WAIT);
+
 	if (ret != 0) {
 		LOG_ERR("Failed to put message on queue");
 		return ret;
@@ -184,18 +175,19 @@ static void webusb_tx_work_handler(struct k_work *work_p)
 {
 	ARG_UNUSED(work_p);
 
-	webusb_tx_msg_t tx_msg;
+	struct net_buf *tx_net_buf = NULL;
 
-	while (k_msgq_get(&webusb_tx_msg_queue, &tx_msg, K_NO_WAIT) == 0) {
-
+	while (k_msgq_get(&webusb_tx_msg_queue, &tx_net_buf, K_NO_WAIT) == 0) {
 		cobs_encode_result result;
 
 		// Leave room for a terminating zero byte.
-		result = cobs_encode(&cobs_encoded_stream, sizeof(cobs_encoded_stream)-1, &tx_msg.data, tx_msg.size);
+		result = cobs_encode(&cobs_encoded_stream, sizeof(cobs_encoded_stream)-1, tx_net_buf->data, tx_net_buf->len);
 		if (result.status != COBS_ENCODE_OK) {
 			LOG_ERR("COBS Encoding failed: %d", result.status);
 		}
 		cobs_encoded_stream[result.out_len++] = '\0';
+
+		net_buf_unref(tx_net_buf);
 
 		// We will never send more than WEBUSB_BULK_EP_MPS so we should
 		// be able to do it as a sync transfer and not handle callbacks.

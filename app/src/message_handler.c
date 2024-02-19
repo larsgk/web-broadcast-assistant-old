@@ -21,7 +21,7 @@
 
 LOG_MODULE_REGISTER(message_handler, LOG_LEVEL_DBG);
 
-#define HEARTBEAT_ON 1
+NET_BUF_POOL_DEFINE(command_tx_msg_pool, CONFIG_TX_MSG_MAX_MESSAGES, sizeof(struct webusb_message) + CONFIG_TX_MSG_MAX_PAYLOAD_LEN, 0, NULL);
 
 struct webusb_ltv_data {
 	uint8_t adv_sid;
@@ -31,53 +31,78 @@ struct webusb_ltv_data {
 } __packed;
 
 
-static K_SEM_DEFINE(webusb_msg_sem, 1, 1);
-
 static void heartbeat_timeout_handler(struct k_timer *dummy_p);
 K_TIMER_DEFINE(heartbeat_timer, heartbeat_timeout_handler, NULL);
 
-static void send_simple_message(enum message_type mtype, enum message_sub_type stype, uint8_t seq_no, int32_t rc);
 
-static struct webusb_message webusb_msg;
 static struct webusb_ltv_data parsed_ltv_data;
-
 static void heartbeat_timeout_handler(struct k_timer *timer)
 {
-	// Assemble heartbeat event and send
-	uint8_t payload[] = { 'H', 'E', 'A', 'R', 'T'};
+	static uint8_t heartbeat_cnt = 0;
+	struct net_buf *tx_net_buf;
+	int ret;
 
-	if (webusb_transmit((uint8_t*)&payload, sizeof(payload)) != 0) {
-		LOG_ERR("FAILED TO SEND ");
+	tx_net_buf = net_buf_alloc(&command_tx_msg_pool, K_FOREVER);
+	if (!tx_net_buf) {
+		return;
 	}
+
+	net_buf_push_u8(tx_net_buf, MESSAGE_TYPE_EVT);
+	net_buf_push_u8(tx_net_buf, MESSAGE_SUBTYPE_HEARTBEAT);
+	net_buf_push_u8(tx_net_buf, heartbeat_cnt++);
+	net_buf_push_le16(tx_net_buf, 0);
+
+	ret = webusb_transmit(tx_net_buf);
+	if (ret != 0) {
+		LOG_ERR("Failed to send response (err=%d)", ret);
+	}
+}
+
+struct net_buf* message_alloc_tx_message(void)
+{
+	struct net_buf *tx_net_buf;
+
+	tx_net_buf = net_buf_alloc(&command_tx_msg_pool, K_NO_WAIT);
+	if (!tx_net_buf) {
+		return NULL;
+	}
+
+	// Reserve headroom for the webusb msg header
+	net_buf_reserve(tx_net_buf, sizeof(struct webusb_message));
+
+	return tx_net_buf;
 }
 
 static void send_simple_message(enum message_type mtype, enum message_sub_type stype, uint8_t seq_no, int32_t rc)
 {
+	struct net_buf *tx_net_buf;
+	uint16_t msg_payload_length;
 	int ret;
 
 	LOG_INF("send simple message(%d, %d, %u, %d)", mtype, stype, seq_no, rc);
 
-	k_sem_take(&webusb_msg_sem, K_FOREVER);
-	memset(&webusb_msg, 0, sizeof(struct webusb_message));
 
-	webusb_msg.type = mtype;
-	webusb_msg.sub_type = stype;
-	webusb_msg.seq_no = seq_no;
-	webusb_msg.length = 0;
+	tx_net_buf = message_alloc_tx_message();
+	if (!tx_net_buf) {
+		LOG_ERR("Failed to send allocate net_buf");
+	}
 
-	/* Add error code */
-	webusb_msg.payload[webusb_msg.length++] = 5;
-	webusb_msg.payload[webusb_msg.length++] = BT_DATA_ERROR_CODE;
-	sys_put_le32(rc, &webusb_msg.payload[webusb_msg.length]);
-	webusb_msg.length += 4;
+	/* Append error code payload */
+	net_buf_add_u8(tx_net_buf, 5);
+	net_buf_add_u8(tx_net_buf, BT_DATA_ERROR_CODE);
+	net_buf_add_le32(tx_net_buf, rc);
+	msg_payload_length = tx_net_buf->len;
 
-	ret = webusb_transmit((uint8_t *)&webusb_msg,
-			      webusb_msg.length + offsetof(struct webusb_message, payload));
+	// Prepend message header
+	net_buf_push_le16(tx_net_buf, msg_payload_length);
+	net_buf_push_u8(tx_net_buf, seq_no);
+	net_buf_push_u8(tx_net_buf, stype);
+	net_buf_push_u8(tx_net_buf, mtype);
+
+	ret = webusb_transmit(tx_net_buf);
 	if (ret != 0) {
 		LOG_ERR("Failed to send message (err=%d)", ret);
 	}
-
-	k_sem_give(&webusb_msg_sem);
 
 }
 
@@ -89,6 +114,22 @@ void send_response(enum message_sub_type stype, uint8_t seq_no, int32_t rc)
 void send_event(enum message_sub_type stype, int32_t rc)
 {
 	send_simple_message(MESSAGE_TYPE_EVT, stype, 0, rc);
+}
+
+void send_net_buf_event(enum message_sub_type stype, struct net_buf *tx_net_buf)
+{
+	int ret;
+
+	// Prepend message header
+	net_buf_push_le16(tx_net_buf, tx_net_buf->len);
+	net_buf_push_u8(tx_net_buf, 0);
+	net_buf_push_u8(tx_net_buf, stype);
+	net_buf_push_u8(tx_net_buf, MESSAGE_TYPE_EVT);
+
+	ret = webusb_transmit(tx_net_buf);
+	if (ret != 0) {
+		LOG_ERR("Failed to send message (err=%d)", ret);
+	}
 }
 
 bool ltv_found(struct bt_data *data, void *user_data)
@@ -149,26 +190,24 @@ void message_handler(struct webusb_message *msg_ptr, uint16_t msg_length)
 
 	msg_net_buf.data = msg_ptr->payload;
 	msg_net_buf.len = msg_ptr->length;
-	msg_net_buf.size = MAX_MSG_PAYLOAD_LEN;
+	msg_net_buf.size = CONFIG_TX_MSG_MAX_PAYLOAD_LEN;
 	msg_net_buf.__buf = msg_ptr->payload;
 
 	bt_data_parse(&msg_net_buf, ltv_found, (void *)&parsed_ltv_data);
 
 	switch (msg_sub_type) {
 	case MESSAGE_SUBTYPE_HEARTBEAT:
-		if (HEARTBEAT_ON) {
+			static bool heartbeat_on = false;
+			if (!heartbeat_on) {
 			// Start generating heartbeats every second
+				heartbeat_on = true;
 			k_timer_start(&heartbeat_timer, K_SECONDS(1), K_SECONDS(1));
 		} else {
+				heartbeat_on = false;
 			// Stop heartbeat timer if running
 			k_timer_stop(&heartbeat_timer);
 		}
-		send_response(msg_sub_type, msg_seq_no, 0);
-		break;
-
-	case MESSAGE_SUBTYPE_DUMMY:
-		LOG_DBG("MESSAGE_SUBTYPE_DUMMY");
-		send_response(msg_sub_type, msg_seq_no, 0);
+		send_response(MESSAGE_SUBTYPE_HEARTBEAT, msg_seq_no, 0);
 		break;
 
 	case MESSAGE_SUBTYPE_START_SINK_SCAN:

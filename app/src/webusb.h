@@ -13,6 +13,7 @@
 #define __WEBUSB_SERIAL_H__
 
 #include <zephyr/types.h>
+#include <zephyr/net/buf.h>
 #include "message_handler.h"
 
 /**
@@ -25,7 +26,7 @@ void webusb_init(void);
  * @brief Transmits a USB package
  *
  */
-int webusb_transmit(uint8_t *data, uint16_t size);
+int webusb_transmit(struct net_buf *tx_net_buf);
 
 /**
  * @brief Register message handler callback

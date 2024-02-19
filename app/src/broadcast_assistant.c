@@ -316,26 +316,22 @@ static bool scan_for_sink(const struct bt_le_scan_recv_info *info, struct net_bu
 
 static void scan_recv_cb(const struct bt_le_scan_recv_info *info, struct net_buf_simple *ad)
 {
-	int err;
-	struct webusb_message msg;
-	struct net_buf_simple ad_clone;
+	struct net_buf *evt_msg;
 	struct scan_recv_data sr_data = {0};
-
-	/* For now, just make a copy if we need to send it */
-	net_buf_simple_clone(ad, &ad_clone);
+	enum message_sub_type evt_msg_sub_type;
 
 	switch (ba_state) {
 	case BROADCAST_ASSISTANT_STATE_SCAN_SOURCE:
 		if (scan_for_source(info, ad, &sr_data)) {
 			/* broadcast source found */
-			msg.sub_type = MESSAGE_SUBTYPE_SOURCE_FOUND;
+			evt_msg_sub_type = MESSAGE_SUBTYPE_SOURCE_FOUND;
 			break; /* send message */
 		}
 		return;
 	case BROADCAST_ASSISTANT_STATE_SCAN_SINK:
 		if (scan_for_sink(info, ad, &sr_data)) {
 			/* broadcast sink found */
-			msg.sub_type = MESSAGE_SUBTYPE_SINK_FOUND;
+			evt_msg_sub_type = MESSAGE_SUBTYPE_SINK_FOUND;
 			break; /* send message */
 		}
 		return;
@@ -343,53 +339,46 @@ static void scan_recv_cb(const struct bt_le_scan_recv_info *info, struct net_buf
 		return;
 	}
 
-	msg.type = MESSAGE_TYPE_EVT;
-	msg.seq_no = 0;
-	msg.length = ad_clone.len;
-	memcpy(msg.payload, ad_clone.data, ad_clone.len);
+	evt_msg = message_alloc_tx_message();
+	net_buf_add_mem(evt_msg, ad->data, ad->len);
 
 	/* Append data from struct bt_le_scan_recv_info (RSSI, BT addr, ..) */
 	/* RSSI */
-	msg.payload[msg.length++] = 2;
-	msg.payload[msg.length++] = BT_DATA_RSSI;
-	msg.payload[msg.length++] = info->rssi;
+	net_buf_add_u8(evt_msg, 2);
+	net_buf_add_u8(evt_msg, BT_DATA_RSSI);
+	net_buf_add_u8(evt_msg, info->rssi);
 	/* bt_addr_le */
 	if (info->addr->type == BT_ADDR_LE_PUBLIC) {
-		msg.payload[msg.length++] = 1 + BT_ADDR_SIZE;
-		msg.payload[msg.length++] = BT_DATA_PUB_TARGET_ADDR;
-		memcpy(&msg.payload[msg.length], &info->addr->a, sizeof(bt_addr_t));
-		msg.length += sizeof(bt_addr_t);
-
+		net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
+		net_buf_add_u8(evt_msg, BT_DATA_PUB_TARGET_ADDR);
+		net_buf_add_mem(evt_msg, &info->addr->a, sizeof(bt_addr_t));
 	} else if (info->addr->type == BT_ADDR_LE_RANDOM) {
-		msg.payload[msg.length++] = 1 + BT_ADDR_SIZE;
-		msg.payload[msg.length++] = BT_DATA_RAND_TARGET_ADDR;
-		memcpy(&msg.payload[msg.length], &info->addr->a, sizeof(bt_addr_t));
-		msg.length += sizeof(bt_addr_t);
+		net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
+		net_buf_add_u8(evt_msg, BT_DATA_RAND_TARGET_ADDR);
+		net_buf_add_mem(evt_msg, &info->addr->a, sizeof(bt_addr_t));
 	}
 
 	if (ba_state == BROADCAST_ASSISTANT_STATE_SCAN_SOURCE) {
 		/* sid */
-		msg.payload[msg.length++] = 2;
-		msg.payload[msg.length++] = BT_DATA_SID;
-		msg.payload[msg.length++] = info->sid;
+		net_buf_add_u8(evt_msg, 2);
+		net_buf_add_u8(evt_msg, BT_DATA_SID);
+		net_buf_add_u8(evt_msg, info->sid);
 		/* pa interval */
-		msg.payload[msg.length++] = 3;
-		msg.payload[msg.length++] = BT_DATA_PA_INTERVAL;
-		sys_put_le16(info->interval, &msg.payload[msg.length]);
-		msg.length += 2;
+		net_buf_add_u8(evt_msg, 3);
+		net_buf_add_u8(evt_msg, BT_DATA_PA_INTERVAL);
+		net_buf_add_le16(evt_msg, info->interval);
 		/* broadcast id */
-		msg.payload[msg.length++] = 5;
-		msg.payload[msg.length++] = BT_DATA_BROADCAST_ID;
-		sys_put_le32(sr_data.broadcast_id, &msg.payload[msg.length]);
-		msg.length += 4;
+		net_buf_add_u8(evt_msg, 5);
+		net_buf_add_u8(evt_msg, BT_DATA_BROADCAST_ID);
+		net_buf_add_le32(evt_msg, sr_data.broadcast_id);
 	}
 
 #ifdef BROADCAST_ASSISTANT_DEBUG
 	char log_str[256] = {0};
-	uint8_t *payload_ptr = &msg.payload[0];
+	uint8_t *payload_ptr = &evt_msg->data[0];
 
 	/* Show message payload */
-	for (int i = 0; i < msg.length;) {
+	for (int i = 0; i < evt_msg->len;) {
 		uint8_t len = *payload_ptr++;
 		char *ch_ptr = &log_str[0];
 
@@ -416,11 +405,7 @@ static void scan_recv_cb(const struct bt_le_scan_recv_info *info, struct net_buf
 	}
 #endif /* BROADCAST_ASSISTANT_DEBUG */
 
-	err = webusb_transmit((uint8_t *)&msg,
-			      msg.length + offsetof(struct webusb_message, payload));
-	if (err) {
-		LOG_ERR("Failed to send sink found evt (err=%d)", err);
-	}
+	send_net_buf_event(evt_msg_sub_type, evt_msg);
 }
 
 static void scan_timeout_cb(void)
