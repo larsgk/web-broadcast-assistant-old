@@ -1,5 +1,7 @@
 // @ts-check
 
+import { BT_DataType } from '../lib/message.js';
+
 /*
 * Sink Item Component
 */
@@ -88,9 +90,23 @@ export class SinkItem extends HTMLElement {
 		this.#rssiEl = this.shadowRoot?.querySelector('#rssi');
 	}
 
+        addrString(addr) {
+                if (!addr) {
+                        return "Unknown address";
+                }
+
+                const val = addr.value;
+
+                if (addr.type === BT_DataType.BT_DATA_RAND_TARGET_ADDR) {
+                        return `${val} (random)`;
+                } else if (addr.type === BT_DataType.BT_DATA_PUB_TARGET_ADDR) {
+                        return `${val} (public)`;
+                }
+        }
+
         refresh() {
 		this.#nameEl.textContent = this.#sink.name;
-		this.#addrEl.textContent = this.#sink.addr;
+		this.#addrEl.textContent = this.addrString(this.#sink.addr);
 		this.#rssiEl.textContent = `RSSI: ${this.#sink.rssi}`;
 
 		this.#uuid16sEl.textContent = `UUID16s: [${this.#sink.uuid16s?.map(
