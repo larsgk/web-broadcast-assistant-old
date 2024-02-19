@@ -159,8 +159,27 @@ export class AssistantModel extends EventTarget {
 		}
 	}
 
-	handleRES(msg) {
-		console.log(`Response message 0x${msg.type.toString(16)}`);
+	handleRES(message) {
+		console.log(`Response message with subType 0x${message.subType.toString}`);
+
+		switch (message.subType) {
+			case MessageSubType.START_SINK_SCAN:
+			this.dispatchEvent(new CustomEvent('sink-scan-started'));
+			break;
+			case MessageSubType.START_SOURCE_SCAN:
+			this.dispatchEvent(new CustomEvent('source-scan-started'));
+			break;
+			case MessageSubType.STOP_SCAN:
+			this.dispatchEvent(new CustomEvent('scan-stopped'));
+			break;
+			case MessageSubType.CONNECT_SINK:
+			// TODO
+			console.log('CONNECT_SINK response received');
+			break;
+			default:
+			console.log(`Missing handler for subType 0x${message.subType.toString(16)}`);
+		}
+
 	}
 
 	handleEVT(message) {
