@@ -71,6 +71,8 @@ button:disabled {
 			<h2>WebUSB Broadcast Assistant</h2>
 			<button id='connect'>Connect to WebUSB device</button>
 
+			<button id='stop_scan'>Stop Scanning</button>
+
 			<!-- broadcast sink components... -->
 			<button id="sink_scan">Scan for sinks</button>
 			<sink-device-list></sink-device-list>
@@ -86,6 +88,7 @@ button:disabled {
 export class MainApp extends HTMLElement {
 	#scanSinkButton
 	#scanSourceButton
+	#stopScanButton
 	#model
 
 	constructor() {
@@ -95,6 +98,11 @@ export class MainApp extends HTMLElement {
 
 		const shadowRoot = this.attachShadow({mode: 'open'});
 
+
+		this.scanStopped = this.scanStopped.bind(this);
+		this.sinkScanStarted = this.sinkScanStarted.bind(this);
+		this.sourceScanStarted = this.sourceScanStarted.bind(this);
+		this.sendStopScan = this.sendStopScan.bind(this);
 		this.sendStartSinkScan = this.sendStartSinkScan.bind(this);
 		this.sendStartSourceScan = this.sendStartSourceScan.bind(this);
 	}
@@ -115,29 +123,70 @@ export class MainApp extends HTMLElement {
 
 		button?.addEventListener('click', WebUSBDeviceService.scan);
 
+		this.#stopScanButton = this.shadowRoot?.querySelector('#stop_scan');
+		this.#stopScanButton.addEventListener('click', this.sendStopScan);
+		this.#stopScanButton.addEventListener('click', this.sendStopScan);
+		// TODO: Re-enable this line when we have a "reset on USB connect" function
+		//this.#stopScanButton.disabled = true;
+
 		this.#scanSinkButton = this.shadowRoot?.querySelector('#sink_scan');
-		this.#scanSinkButton.addEventListener('click', this.sendStartSinkScan)
+		this.#scanSinkButton.addEventListener('click', this.sendStartSinkScan);
 
 		this.#scanSourceButton = this.shadowRoot?.querySelector('#source_scan');
-		this.#scanSourceButton.addEventListener('click', this.sendStartSourceScan)
+		this.#scanSourceButton.addEventListener('click', this.sendStartSourceScan);
+
+		this.#model.addEventListener('scan-stopped', this.scanStopped);
+		this.#model.addEventListener('sink-scan-started', this.sinkScanStarted);
+		this.#model.addEventListener('source-scan-started', this.sourceScanStarted);
 	}
 
+	scanStopped() {
+		console.log("Scan Stopped");
+
+		this.#stopScanButton.disabled = true;
+		this.#scanSinkButton.disabled = false;
+		this.#scanSourceButton.disabled = false;
+	}
+
+	sinkScanStarted() {
+		console.log("Sink Scan Started");
+
+		this.#stopScanButton.disabled = false;
+		this.#scanSinkButton.disabled = true;
+		this.#scanSourceButton.disabled = false;
+	}
+
+	sourceScanStarted() {
+		console.log("Source Scan Started");
+
+		this.#stopScanButton.disabled = false;
+		this.#scanSinkButton.disabled = false;
+		this.#scanSourceButton.disabled = true;
+	}
+
+	sendStopScan() {
+		console.log("Clicked Stop Scan");
+
+		this.#model.stopScan();
+
+		this.#stopScanButton.disabled = true;
+	}
+
+
 	sendStartSinkScan() {
-		console.log("Clicked Start Sink Scan")
+		console.log("Clicked Start Sink Scan");
 
 		this.#model.startSinkScan();
 
-		// TODO: Disable when we have functionality to renable (when scanning has stopped)
-		// this.#scanSinkButton.disabled = true;
+		this.#scanSinkButton.disabled = true;
 	}
 
 	sendStartSourceScan() {
-		console.log("Clicked Start Source Scan")
+		console.log("Clicked Start Source Scan");
 
 		this.#model.startSourceScan();
 
-		// TODO: Disable when we have functionality to renable (when scanning has stopped)
-		// this.#scanSourceButton.disabled = true;
+		this.#scanSourceButton.disabled = true;
 	}
 }
 customElements.define('main-app', MainApp);
