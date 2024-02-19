@@ -13,7 +13,7 @@
 #define __WEBUSB_SERIAL_H__
 
 #include <zephyr/types.h>
-#include "command.h"
+#include "message_handler.h"
 
 /**
  * @brief Initializes WebUSB component
@@ -28,14 +28,13 @@ void webusb_init(void);
 int webusb_transmit(uint8_t *data, uint16_t size);
 
 /**
- * @brief Register command handler callback
+ * @brief Register message handler callback
  *
- * Function to register command handler callback
- * for handling device command.
+ * Function to register message handler callback for handling device messages
  *
- * @param [in] handlers Pointer to WebUSB command handler structure
+ * @param [in] handlers Pointer to WebUSB message handler structure
  */
-void webusb_register_command_handler(void (*webusb_cmd_handler)(struct command_message *command_ptr,
-								uint16_t command_length));
+void webusb_register_message_handler(void (*cb)(struct webusb_message *msg_ptr,
+						uint16_t msg_length));
 
 #endif /* __WEBUSB_SERIAL_H__ */

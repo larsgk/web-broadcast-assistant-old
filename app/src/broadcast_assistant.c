@@ -12,11 +12,10 @@
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/audio/audio.h>
 #include <zephyr/logging/log.h>
-
 #include <zephyr/sys/byteorder.h>
 
 #include "webusb.h"
-#include "command.h"
+#include "message_handler.h"
 #include "broadcast_assistant.h"
 
 LOG_MODULE_REGISTER(broadcast_assistant, LOG_LEVEL_INF);
@@ -44,6 +43,8 @@ static struct bt_le_scan_cb scan_callbacks = {
 	.recv = scan_recv_cb,
 	.timeout = scan_timeout_cb,
 };
+
+static struct bt_conn *broadcast_sink_conn;
 
 struct scan_recv_info {
 	char bt_name[BT_NAME_LEN];
@@ -130,12 +131,12 @@ static bool device_found(struct bt_data *data, void *user_data)
 			memcpy(&u16, &data->data[i], sizeof(u16));
 			uuid = BT_UUID_DECLARE_16(sys_le16_to_cpu(u16));
 
-			if (bt_uuid_cmp(uuid, BT_UUID_BASS)) {
+			if (bt_uuid_cmp(uuid, BT_UUID_BASS) == 0) {
 				sr_info->has_bass = true;
 				continue;
 			}
 
-			if (bt_uuid_cmp(uuid, BT_UUID_PACS)) {
+			if (bt_uuid_cmp(uuid, BT_UUID_PACS) == 0) {
 				sr_info->has_pacs = true;
 				continue;
 			}
@@ -210,7 +211,7 @@ static bool scan_for_sink(const struct bt_le_scan_recv_info *info, struct net_bu
 static void scan_recv_cb(const struct bt_le_scan_recv_info *info, struct net_buf_simple *ad)
 {
 	int err;
-	struct command_message msg;
+	struct webusb_message msg;
 	struct net_buf_simple ad_clone;
 
 	/* For now, just make a copy if we need to send it */
@@ -247,6 +248,13 @@ static void scan_recv_cb(const struct bt_le_scan_recv_info *info, struct net_buf
 	msg.payload[msg.length++] = BT_DATA_RSSI;
 	msg.payload[msg.length++] = info->rssi;
 	/* bt_addr_le */
+
+#if 0
+	char addr_str[BT_ADDR_LE_STR_LEN];
+	bt_addr_le_to_str(info->addr, addr_str, sizeof(addr_str));
+	LOG_INF("Found to %s", addr_str);
+#endif
+
 	if (info->addr->type == BT_ADDR_LE_PUBLIC) {
 		msg.payload[msg.length++] = 1 + BT_ADDR_SIZE;
 		msg.payload[msg.length++] = BT_DATA_PUB_TARGET_ADDR;
@@ -302,7 +310,7 @@ static void scan_recv_cb(const struct bt_le_scan_recv_info *info, struct net_buf
 #endif /* BROADCAST_ASSISTANT_DEBUG */
 
 	err = webusb_transmit((uint8_t *)&msg,
-			      msg.length + offsetof(struct command_message, payload));
+			      msg.length + offsetof(struct webusb_message, payload));
 	if (err != 0) {
 		LOG_ERR("Failed to send sink found evt (err=%d)", err);
 	}
@@ -317,62 +325,111 @@ static void scan_timeout_cb(void)
  * Public functions
  */
 
-void scan_for_broadcast_source(uint8_t seq_no)
+int scan_for_broadcast_source(uint8_t seq_no)
 {
 	if (ba_state == BROADCAST_ASSISTANT_STATE_IDLE) {
 		int err = bt_le_scan_start(BT_LE_SCAN_PASSIVE, NULL);
 		if (err) {
 			LOG_ERR("Scanning failed to start (err %d)", err);
-			return;
+			return err;
 		}
 	}
 
 	LOG_INF("Scanning for Broadcast Source started");
-	send_response(MESSAGE_SUBTYPE_START_SOURCE_SCAN, seq_no);
 
 	ba_state = BROADCAST_ASSISTANT_STATE_SCAN_SOURCE;
+
+	return 0;
 }
 
-void scan_for_broadcast_sink(uint8_t seq_no)
+int scan_for_broadcast_sink(uint8_t seq_no)
 {
 	if (ba_state == BROADCAST_ASSISTANT_STATE_IDLE) {
 		int err = bt_le_scan_start(BT_LE_SCAN_PASSIVE, NULL);
 		if (err) {
 			LOG_ERR("Scanning failed to start (err %d)", err);
-			return;
+			return err;
 		}
 	}
 
 	LOG_INF("Scanning for Broadcast Sink started");
-	send_response(MESSAGE_SUBTYPE_START_SINK_SCAN, seq_no);
 
 	ba_state = BROADCAST_ASSISTANT_STATE_SCAN_SINK;
+
+	return 0;
 }
 
-void stop_scanning(uint8_t seq_no)
+int stop_scanning(uint8_t seq_no)
 {
 	if (ba_state == BROADCAST_ASSISTANT_STATE_IDLE) {
 		/* No scan ongoing */
-		return;
+		return 0;
 	}
 
 	int err = bt_le_scan_stop();
 	if (err != 0) {
 		LOG_ERR("bt_le_scan_stop failed with %d", err);
+		return err;
 	}
 
 	LOG_INF("Scanning stopped");
-	send_response(MESSAGE_SUBTYPE_STOP_SCAN, seq_no);
 
 	ba_state = BROADCAST_ASSISTANT_STATE_IDLE;
+
+	return 0;
 }
 
-void broadcast_assistant_init(void)
+int connect_to_sink(uint8_t seq_no, uint16_t msg_length, uint8_t *payload)
 {
+	char addr_str[BT_ADDR_LE_STR_LEN];
+	bt_addr_le_t bt_addr_le;
+	int err;
+
+	LOG_INF("Connect to sink [%02x %02x %02x %02x %02x %02x %02x %02x]",
+		payload[0], payload[1], payload[2],
+		payload[3], payload[4], payload[5],
+		payload[6], payload[7]);
+
+	if (msg_length != (offsetof(struct webusb_message, payload) + 1 /* len */ + 1 /* type */ +
+			   BT_ADDR_SIZE)) {
+		LOG_ERR("Invalid payload");
+		return -1;
+	}
+	if (payload[0] != BT_ADDR_LE_SIZE) {
+		LOG_ERR("Invalid payload length %d", payload[0]);
+		return -1;
+	}
+	if (payload[1] != BT_DATA_PUB_TARGET_ADDR && payload[1] != BT_DATA_RAND_TARGET_ADDR) {
+		LOG_ERR("Invalid bt addr type %d", payload[1]);
+		return -1;
+	}
+
+	bt_addr_le.type =
+		payload[1] == BT_DATA_PUB_TARGET_ADDR ? BT_ADDR_LE_PUBLIC : BT_ADDR_LE_RANDOM;
+	memcpy(&bt_addr_le.a.val[0], &payload[2], BT_ADDR_SIZE);
+
+	bt_addr_le_to_str(&bt_addr_le, addr_str, sizeof(addr_str));
+
+	LOG_INF("Connecting to %s", addr_str);
+
+	err = bt_conn_le_create(&bt_addr_le, BT_CONN_LE_CREATE_CONN, BT_LE_CONN_PARAM_DEFAULT,
+				&broadcast_sink_conn);
+	if (err != 0) {
+		LOG_ERR("Failed creating connection (err=%d)", err);
+		return err;
+	}
+
+	return 0;
+}
+
+int broadcast_assistant_init(void)
+{
+	broadcast_sink_conn = NULL;
+
 	int err = bt_enable(NULL);
 	if (err) {
 		LOG_ERR("Bluetooth init failed (err %d)", err);
-		return;
+		return err;
 	}
 
 	LOG_INF("Bluetooth initialized");
@@ -381,4 +438,6 @@ void broadcast_assistant_init(void)
 	LOG_INF("Bluetooth scan callback registered");
 
 	ba_state = BROADCAST_ASSISTANT_STATE_IDLE;
+
+	return 0;
 }
