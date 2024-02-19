@@ -2,7 +2,7 @@
 
 import * as AssistantModel from '../models/assistant-model.js';
 
-import './sink-item.js';
+import { SinkItem } from './sink-item.js';
 import './app-button.js';
 
 /*
@@ -42,7 +42,9 @@ export class SinkDeviceList extends HTMLElement {
 	constructor() {
 		super();
 
-		this.addFoundSink = this.addFoundSink.bind(this);
+		this.sinkFound = this.sinkFound.bind(this);
+		this.sinkUpdated = this.sinkUpdated.bind(this);
+		this.sinkClicked = this.sinkClicked.bind(this);
 
 		const shadowRoot = this.attachShadow({mode: 'open'});
 	}
@@ -61,7 +63,8 @@ export class SinkDeviceList extends HTMLElement {
 
 		this.#model = AssistantModel.getInstance();
 
-		this.#model.addEventListener('sink-found', this.addFoundSink)
+		this.#model.addEventListener('sink-found', this.sinkFound)
+		this.#model.addEventListener('sink-updated', this.sinkUpdated)
 	}
 
 	disconnectedCallback() {
@@ -74,49 +77,46 @@ export class SinkDeviceList extends HTMLElement {
 		this.#model.startSinkScan();
 	}
 
-	addFoundSink(evt) {
+	sinkClicked(evt) {
+		const sinkEl = evt.target;
+		// When sink is not connected, request for the sink to be connected
+		// and mark the sink with connection pending.
+		// Successful connection will result in an event from the attached
+		// broadcast assistant device.
+
+		// Likewise, if the sink is connected, a disconnect request is sent,
+		// item is marked disconnection pending, etc.
+
+		console.log('Sink clicked:', sinkEl.getModel());
+	}
+
+	sinkFound(evt) {
+		// Assume that the AssistantModel has eliminated duplicates
+		// If the addr is random and RPA changed, device will appear
+		// As duplicate and the old entry will stay (stale)
+		// TODO: Possibly remove stale entries - however, this should
+		// not be a big issue.
 		const { sink } = evt.detail;
 
-		console.log('EVT', evt);
-
-		// Just use the name for now... ignore duplicates...
-		var elements = this.#list.querySelectorAll('sink-item');
-		var sinkExists = false;
-		elements.forEach( e => {
-			var sinkName = e.shadowRoot.getElementById('name')?.textContent
-			if (sinkName === sink.name) {
-				sinkExists = true;
-				return;
-			}
-		});
-
-		// TODO: Update RSSI before returning
-		if (sinkExists) {
-			return;
-		}
-
-		// Just use the name for now... ignore duplicates...
-		const el = document.createElement('sink-item');
+		const el = new SinkItem();
 		this.#list.appendChild(el);
 		el.setModel(sink);
 
-		// For now, just some simple green selector color. Only one can be selected at a time
-		el.addEventListener('click', () => {
-			var elements = this.#list.querySelectorAll('sink-item');
-			elements.forEach( _el => {
-				if (_el.isSameNode(el)) {
-					const { selectedSource } = _el;
-					this.dispatchEvent(new CustomEvent('sink-selected', {detail: { selectedSource }}));
+		el.addEventListener('click', this.sinkClicked);
+	}
 
-					_el.style.backgroundColor = "green";
-				} else {
-					_el.style.backgroundColor = "white";
-				}
-			});
+	sinkUpdated(evt) {
+		const { sink } = evt.detail;
 
-			// TODO: If element was clicked, send event to model, so that model
-			// can tell USB to let connected sinks sync to the Broadcast Source
-		});
+		const items = Array.from(this.#list.querySelectorAll('sink-item'));
+
+		const el = items.find(i => i.getModel() === sink);
+
+		if (el) {
+			el.refresh();
+		} else {
+			console.warn('sink not found!', sink);
+		}
 	}
 }
 customElements.define('sink-device-list', SinkDeviceList);

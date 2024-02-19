@@ -2,7 +2,7 @@
 
 import * as AssistantModel from '../models/assistant-model.js';
 
-import './source-item.js';
+import { SourceItem } from './source-item.js';
 import './app-button.js';
 
 /**
@@ -42,7 +42,8 @@ export class SourceDeviceList extends HTMLElement {
 	constructor() {
 		super();
 
-		this.addFoundSource = this.addFoundSource.bind(this);
+		this.sourceFound = this.sourceFound.bind(this);
+		this.sourceUpdated = this.sourceUpdated.bind(this);
 
 		const shadowRoot = this.attachShadow({mode: 'open'});
 	}
@@ -61,7 +62,8 @@ export class SourceDeviceList extends HTMLElement {
 
 		this.#model = AssistantModel.getInstance();
 
-		this.#model.addEventListener('source-found', this.addFoundSource)
+		this.#model.addEventListener('source-found', this.sourceFound)
+		this.#model.addEventListener('source-updated', this.sourceUpdated)
 	}
 
 	disconnectedCallback() {
@@ -74,54 +76,48 @@ export class SourceDeviceList extends HTMLElement {
 		this.#model.startSourceScan();
 	}
 
-	addFoundSource(evt) {
+	sourceClicked(evt) {
+		const sourceEl = evt.target;
+		// If a source is clicked, a request is sent to the (USB) attached broadcast
+		// assistant device.
+
+		// TBD: Mark the source item as selected (maybe in a pending state until RES)
+
+		// When a source is successfully added to a sink, an event should
+		// be sent from the attached assistant device to allow e.g. the broadcast ID
+		// to be shown on the attached sink(s)
+
+		console.log('Source clicked:', sourceEl.getModel());
+	}
+
+	sourceFound(evt) {
+		// Assume that the AssistantModel has eliminated duplicates
+		// If the addr is random and RPA changed, device will appear
+		// As duplicate and the old entry will stay (stale)
+		// TODO: Possibly remove stale entries - however, this should
+		// not be a big issue.
 		const { source } = evt.detail;
 
-		console.log('EVT', evt);
-
-		// TODO: Change check to address - just use the name for now ... ignore duplicates...
-		const elements = this.#list.querySelectorAll('source-item');
-		let _source = null;
-		elements.forEach( e => {
-			var sourceName = e.shadowRoot.getElementById('name')?.textContent
-			if (sourceName === source.name) {
-				_source = e;
-				return;
-			}
-		});
-		console.log(_source);
-
-		// TODO: Update RSSI before returning
-		if (_source) {
-			_source.setModel(source);
-			return;
-		}
-
-		const el = document.createElement('source-item');
+		const el = new SourceItem();
 		this.#list.appendChild(el);
 		el.setModel(source);
 
-		// For now, just some simple green selector color. Only one can be selected at a time
-		el.addEventListener('click', () => {
-			var elements = this.#list.querySelectorAll('source-item');
-			elements.forEach( _el => {
-				if (_el.isSameNode(el)) {
-					const { selectedSource } = _el;
-					this.dispatchEvent(new CustomEvent('source-selected', {detail: { selectedSource }}));
-
-					_el.style.backgroundColor = "green";
-				} else {
-					_el.style.backgroundColor = "white";
-				}
-			});
-
-			// TODO: If element was clicked, send event to model, so that model
-			// can tell USB to let connected sinks sync to the Broadcast Source
-		});
-
-
+		el.addEventListener('click', this.sourceClicked);
 	}
 
+	sourceUpdated(evt) {
+		const { source } = evt.detail;
+
+		const items = Array.from(this.#list.querySelectorAll('source-item'));
+
+		const el = items.find(i => i.getModel() === source);
+
+		if (el) {
+			el.refresh();
+		} else {
+			console.warn('source not found!', source);
+		}
+	}
 }
 
 

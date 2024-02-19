@@ -47,12 +47,14 @@ export const BT_DataType = Object.freeze({
 	BT_DATA_NAME_COMPLETE:		0x09,
 
 	BT_DATA_SVC_DATA16:		0x16,
-
 	BT_DATA_PUB_TARGET_ADDR:	0x17,
 	BT_DATA_RAND_TARGET_ADDR:	0x18,
 
 	BT_DATA_BROADCAST_NAME:		0x30,
 
+	// The following types are created for this app (not standard)
+	BT_DATA_PA_INTERVAL:		0xfc,
+	BT_DATA_SID:			0xfd,
 	BT_DATA_RSSI:			0xfe,
 });
 
@@ -103,8 +105,6 @@ export const msgToArray = msg => {
 		throw new Error("If set, payload must be a Uint8Array");
 	}
 
-	console.log('Validation complete...');
-
 	const header = new Uint8Array([msg.type, msg.subType, seqNo, payloadSize & 0xff, payloadSize >> 8]);
 
 	if (msg.payload instanceof Uint8Array && msg.payload.length !== 0) {
@@ -153,18 +153,30 @@ const bufToAddressString = (data) => {
 
 	return Array.from(data, byte => {
 		return ('0' + (byte & 0xFF).toString(16)).slice(-2);
-	}).join(':')
+	}).join(':');
 }
 
-const bufToInt8Array = (data) => {
-	const res = [];
-
-	for (var i = 0; i < data.length; i++) {
-		var intSign = data[i] & (1 << 7);
-		res[i] = (data[i] & 0x7f) * (intSign !== 0 ? -1 : 1);
+const bufToSignedInt = (data) => {
+	if (!(data instanceof Uint8Array)) {
+		throw new Error("Input data must be a Uint8Array");
 	}
 
-	return res;
+	if (data.length < 1 || data.length > 4) {
+		throw new Error("Can only handle int8, 16, 24, 32");
+	}
+	const width = data.length * 8;
+
+	let item = 0;
+	let count = 0;
+	while(count < data.length) {
+		item += data[count] << (8*count);
+		count++;
+	}
+
+	const neg = item & (1 << (width - 1));
+	const tmp = (1 << width);
+	const min = -tmp;
+	return neg ? min + (item & (tmp - 1)) : item;
 }
 
 const bufToValueArray = (data, itemsize) => {
@@ -226,7 +238,7 @@ const parseLTVItem = (type, len, value) => {
 		item.value = bufToAddressString(value)
 		break;
 		case BT_DataType.BT_DATA_RSSI:
-		item.value = bufToInt8Array(value);
+		item.value = bufToSignedInt(value);
 		break;
 		default:
 		item.value = "UNHANDLED";
@@ -239,7 +251,7 @@ const parseLTVItem = (type, len, value) => {
 export const ltvToArray = payload => {
 	const res = [];
 
-	console.log('LTV decode of: ', arrayToHex(payload));
+	// console.log('LTV decode of: ', arrayToHex(payload));
 	let ptr = 0;
 	// Iterate over the LTV fields and convert to items in array.
 	while (ptr < payload.length) {

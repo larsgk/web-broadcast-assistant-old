@@ -70,33 +70,42 @@ export class SinkItem extends HTMLElement {
 	#addrEl
 	#uuid16sEl
 	#rssiEl
-	
+
 	constructor() {
 		super();
-		
+
+                this.setModel = this.setModel.bind(this);
+                this.refresh = this.refresh.bind(this);
+
 		const shadowRoot = this.attachShadow({mode: 'open'});
 		shadowRoot.appendChild(template.content.cloneNode(true));
 	}
-	
+
 	connectedCallback() {
 		this.#nameEl = this.shadowRoot?.querySelector('#name');
 		this.#addrEl = this.shadowRoot?.querySelector('#addr');
 		this.#uuid16sEl = this.shadowRoot?.querySelector('#uuid16s');
 		this.#rssiEl = this.shadowRoot?.querySelector('#rssi');
 	}
-	
-	setModel(sink) {
-		this.#sink = sink;
-		
-		// Set name (and more...)
+
+        refresh() {
 		this.#nameEl.textContent = this.#sink.name;
 		this.#addrEl.textContent = this.#sink.addr;
 		this.#rssiEl.textContent = `RSSI: ${this.#sink.rssi}`;
 
 		this.#uuid16sEl.textContent = `UUID16s: [${this.#sink.uuid16s?.map(
 			a => {return '0x'+a.toString(16)}
-			)} ]`;
-		}
+		)} ]`;
+        }
+
+	setModel(sink) {
+		this.#sink = sink;
+
+                this.refresh();
 	}
-	customElements.define('sink-item', SinkItem);
-	
+
+        getModel() {
+                return this.#sink;
+        }
+}
+customElements.define('sink-item', SinkItem);
