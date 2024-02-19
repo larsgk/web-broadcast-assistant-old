@@ -87,7 +87,12 @@ export class SinkDeviceList extends HTMLElement {
 		// Likewise, if the sink is connected, a disconnect request is sent,
 		// item is marked disconnection pending, etc.
 
-		console.log('Sink clicked:', sinkEl.getModel());
+		const sink = sinkEl.getModel();
+
+		console.log('Sink clicked:', sink);
+
+		// For now - just call connect (until we have more state handling)
+		this.#model.connectToSink(sink);
 	}
 
 	sinkFound(evt) {

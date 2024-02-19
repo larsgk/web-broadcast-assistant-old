@@ -4,8 +4,9 @@ import {
 	MessageType,
 	MessageSubType,
 	BT_DataType,
-	ltvToArray,
-	ltvArrayFindValue
+	ltvToTvArray,
+	tvArrayToLtv,
+	tvArrayFindItem
 } from '../lib/message.js';
 
 /**
@@ -71,20 +72,20 @@ export class AssistantModel extends EventTarget {
 	handleSourceFound(message) {
 		console.log(`Handle found Source`);
 
-		const payloadArray = ltvToArray(message.payload);
+		const payloadArray = ltvToTvArray(message.payload);
 		// console.log('Payload', payloadArray);
 
-		const addr = ltvArrayFindValue(payloadArray, [
+		const addr = tvArrayFindItem(payloadArray, [
 			BT_DataType.BT_DATA_PUB_TARGET_ADDR,
 			BT_DataType.BT_DATA_RAND_TARGET_ADDR
-		])?.value;
+		]);
 
 		if (!addr) {
 			// TBD: Throw exception?
 			return;
 		}
 
-		const rssi = ltvArrayFindValue(payloadArray, [
+		const rssi = tvArrayFindItem(payloadArray, [
 			BT_DataType.BT_DATA_RSSI
 		])?.value;
 
@@ -96,11 +97,11 @@ export class AssistantModel extends EventTarget {
 			source = {
 				addr,
 				rssi,
-				name: ltvArrayFindValue(payloadArray, [
+				name: tvArrayFindItem(payloadArray, [
 					BT_DataType.BT_DATA_NAME_SHORTENED,
 					BT_DataType.BT_DATA_NAME_COMPLETE
 				])?.value,
-				broadcast_name: ltvArrayFindValue(payloadArray, [
+				broadcast_name: tvArrayFindItem(payloadArray, [
 					BT_DataType.BT_DATA_BROADCAST_NAME
 				])?.value
 			}
@@ -117,34 +118,34 @@ export class AssistantModel extends EventTarget {
 	handleSinkFound(message) {
 		console.log(`Handle found Sink`);
 
-		const payloadArray = ltvToArray(message.payload);
+		const payloadArray = ltvToTvArray(message.payload);
 		// console.log('Payload', payloadArray);
 
-		const addr = ltvArrayFindValue(payloadArray, [
+		const addr = tvArrayFindItem(payloadArray, [
 			BT_DataType.BT_DATA_PUB_TARGET_ADDR,
 			BT_DataType.BT_DATA_RAND_TARGET_ADDR
-		])?.value;
+		]);
 
 		if (!addr) {
 			// TBD: Throw exception?
 			return;
 		}
 
-		const rssi = ltvArrayFindValue(payloadArray, [
+		const rssi = tvArrayFindItem(payloadArray, [
 			BT_DataType.BT_DATA_RSSI
 		])?.value;
 
 		// If device already exists, just update RSSI, otherwise add to list
-		let sink = this.#sinks.find(i => i.addr === addr);
+		let sink = this.#sinks.find(i => i.addr.value === addr.value);
 		if (!sink) {
 			sink = {
 				addr,
 				rssi,
-				name: ltvArrayFindValue(payloadArray, [
+				name: tvArrayFindItem(payloadArray, [
 					BT_DataType.BT_DATA_NAME_SHORTENED,
 					BT_DataType.BT_DATA_NAME_COMPLETE
 				])?.value,
-				uuid16s: ltvArrayFindValue(payloadArray, [
+				uuid16s: tvArrayFindItem(payloadArray, [
 					BT_DataType.BT_DATA_UUID16_ALL,
 					BT_DataType.BT_DATA_UUID16_SOME,
 				])?.value || []
@@ -205,7 +206,6 @@ export class AssistantModel extends EventTarget {
 	startSinkScan() {
 		console.log("Sending Start Sink Scan CMD")
 
-		// Just placeholders, this is not how components should work
 		const message = {
 			type: Number(MessageType.CMD),
 			subType: MessageSubType.START_SINK_SCAN,
@@ -219,7 +219,6 @@ export class AssistantModel extends EventTarget {
 	startSourceScan() {
 		console.log("Sending Start Source Scan CMD")
 
-		// Just placeholders, this is not how components should work
 		const message = {
 			type: Number(MessageType.CMD),
 			subType: MessageSubType.START_SOURCE_SCAN,
@@ -233,7 +232,6 @@ export class AssistantModel extends EventTarget {
 	stopScan() {
 		console.log("Sending Stop Scan CMD")
 
-		// Just placeholders, this is not how components should work
 		const message = {
 			type: Number(MessageType.CMD),
 			subType: MessageSubType.STOP_SCAN,
@@ -244,6 +242,28 @@ export class AssistantModel extends EventTarget {
 		this.#service.sendCMD(message)
 	}
 
+	connectToSink(sink) {
+		console.log("Sending Connect Sink CMD");
+
+		const { addr } = sink;
+
+		if (!addr) {
+			throw Error("Address not found in sink object!");
+		}
+
+		const payload = tvArrayToLtv([addr]);
+
+		console.log('addr payload', payload);
+
+		const message = {
+			type: Number(MessageType.CMD),
+			subType: MessageSubType.CONNECT_SINK,
+			seqNo: 123,
+			payload
+		};
+
+		this.#service.sendCMD(message);
+	}
 }
 
 let _instance = null;

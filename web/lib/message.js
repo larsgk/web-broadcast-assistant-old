@@ -27,6 +27,7 @@ export const MessageSubType = Object.freeze({
 	START_SINK_SCAN:	0x01,
 	START_SOURCE_SCAN:	0x02,
 	STOP_SCAN:		0x03,
+	CONNECT_SINK:		0x04,
 
 	DUMMY:			0x7F,
 
@@ -156,6 +157,10 @@ const bufToAddressString = (data) => {
 	}).join(':');
 }
 
+const addressStringToArray = (str) => {
+	return str.split(':').map(v => Number.parseInt(v, 16));
+}
+
 const bufToSignedInt = (data) => {
 	if (!(data instanceof Uint8Array)) {
 		throw new Error("Input data must be a Uint8Array");
@@ -248,7 +253,13 @@ const parseLTVItem = (type, len, value) => {
 	return item;
 }
 
-export const ltvToArray = payload => {
+/**
+* ltvToPayloadArray
+*
+* @param payload	Uint8Array containing LTV fields
+* @returns 		Type Value Array containing decoded fields [{type, value}, ...]
+*/
+export const ltvToTvArray = payload => {
 	const res = [];
 
 	// console.log('LTV decode of: ', arrayToHex(payload));
@@ -273,7 +284,52 @@ export const ltvToArray = payload => {
 	return res;
 }
 
-export const ltvArrayFindValue = (arr, types) => {
+/**
+* tvArrayToLtv
+*
+* @param arr		Type Value Array containing decoded fields [{type, value}, ...]
+* @returns 		Uint8Array containing LTV fields
+*/
+export const tvArrayToLtv = arr => {
+	const result = [];
+
+	for (const item of arr) {
+		const { type, value } = item;
+		let outArr;
+
+		if (type === undefined || value === undefined) {
+			// TBD: Throw error?
+			continue;
+		}
+
+		switch (type) {
+			case BT_DataType.BT_DATA_PUB_TARGET_ADDR:
+			case BT_DataType.BT_DATA_RAND_TARGET_ADDR:
+			outArr = addressStringToArray(value);
+			break;
+			default:
+			// Don't add fields we don't handle yet
+			continue;
+		}
+
+		const len = outArr.length + 1;
+
+		result.push(len);
+		result.push(type);
+		result.push(...outArr);
+	}
+
+	return new Uint8Array(result);
+}
+
+/**
+* tvArrayFindItem
+*
+* @param arr 		Type Value Array [{type, value}, ...] (e.g. output from ltvToArray)
+* @param types		Array with Types to search for
+* @returns		First element found with type in types
+*/
+export const tvArrayFindItem = (arr, types) => {
 	// This will find and return the first value, matching any type given
 
 	return arr.find(item => types.includes(item.type));

@@ -101,7 +101,7 @@ export class SourceItem extends HTMLElement {
 		// Set name (and more...)
 		this.#nameEl.textContent = this.#source.name;
 		this.#broadcastNameEl.textContent = this.#source.broadcast_name;
-		this.#addrEl.textContent = this.#source.addr;
+		this.#addrEl.textContent = this.#source.addr?.value;
 		this.#rssiEl.textContent = `RSSI: ${this.#source.rssi}`;
 
 		this.#broadcastIdEl.textContent = `Broadcast ID: 0x${this.#source.broadcastId}`;
