@@ -3,7 +3,6 @@
 import * as AssistantModel from '../models/assistant-model.js';
 
 import { SinkItem } from './sink-item.js';
-import './app-button.js';
 
 /*
 * Sink Device List Component
@@ -28,7 +27,7 @@ template.innerHTML = `
 }
 </style>
 <div id="container">
-<app-button id="scan">SCAN SINK</app-button>
+<h2>Sink list</h2>
 <div id="list">
 </div>
 </div>
@@ -36,7 +35,6 @@ template.innerHTML = `
 
 export class SinkDeviceList extends HTMLElement {
 	#list
-	#scanButton
 	#model
 
 	constructor() {
@@ -54,12 +52,7 @@ export class SinkDeviceList extends HTMLElement {
 
 		this.shadowRoot?.appendChild(template.content.cloneNode(true));
 		// Add listeners, etc.
-		this.#scanButton = this.shadowRoot?.querySelector('#scan');
 		this.#list = this.shadowRoot?.querySelector('#list');
-
-		this.sendStartSinkScan = this.sendStartSinkScan.bind(this);
-
-		this.#scanButton.addEventListener('click', this.sendStartSinkScan);
 
 		this.#model = AssistantModel.getInstance();
 
@@ -69,12 +62,6 @@ export class SinkDeviceList extends HTMLElement {
 
 	disconnectedCallback() {
 		// Remove listeners, etc.
-	}
-
-	sendStartSinkScan() {
-		console.log("Clicked Start Sink Scan")
-
-		this.#model.startSinkScan();
 	}
 
 	sinkClicked(evt) {
@@ -95,6 +82,16 @@ export class SinkDeviceList extends HTMLElement {
 		this.#model.connectToSink(sink);
 	}
 
+	// TODO: This is not called for now but can be used if we want to sort by RSSI
+	orderByRssi() {
+		const elements = this.#list.querySelectorAll('sink-item');
+
+		let order = 0;
+		[...elements]
+			.sort((a, b) => b.getModel().rssi - a.getModel().rssi)
+			.forEach(node => { node.style.order=order++ });
+	}
+
 	sinkFound(evt) {
 		// Assume that the AssistantModel has eliminated duplicates
 		// If the addr is random and RPA changed, device will appear
@@ -106,6 +103,8 @@ export class SinkDeviceList extends HTMLElement {
 		const el = new SinkItem();
 		this.#list.appendChild(el);
 		el.setModel(sink);
+
+		// this.orderByRssi();
 
 		el.addEventListener('click', this.sinkClicked);
 	}
@@ -119,6 +118,7 @@ export class SinkDeviceList extends HTMLElement {
 
 		if (el) {
 			el.refresh();
+			// this.orderByRssi();
 		} else {
 			console.warn('sink not found!', sink);
 		}

@@ -3,7 +3,6 @@
 import * as AssistantModel from '../models/assistant-model.js';
 
 import { SourceItem } from './source-item.js';
-import './app-button.js';
 
 /**
 Source Device List Component
@@ -28,7 +27,7 @@ template.innerHTML = `
 }
 </style>
 <div id="container">
-<app-button id="scan">SCAN SOURCE</app-button>
+<h2>Source list</h2>
 <div id="list">
 </div>
 </div>
@@ -36,7 +35,6 @@ template.innerHTML = `
 
 export class SourceDeviceList extends HTMLElement {
 	#list
-	#scanButton
 	#model
 
 	constructor() {
@@ -53,12 +51,7 @@ export class SourceDeviceList extends HTMLElement {
 
 		this.shadowRoot?.appendChild(template.content.cloneNode(true));
 		// Add listeners, etc.
-		this.#scanButton = this.shadowRoot?.querySelector('#scan');
 		this.#list = this.shadowRoot?.querySelector('#list');
-
-		this.sendStartSourceScan = this.sendStartSourceScan.bind(this);
-
-		this.#scanButton.addEventListener('click', this.sendStartSourceScan)
 
 		this.#model = AssistantModel.getInstance();
 
@@ -68,12 +61,6 @@ export class SourceDeviceList extends HTMLElement {
 
 	disconnectedCallback() {
 		// Remove listeners, etc.
-	}
-
-	sendStartSourceScan() {
-		console.log("Clicked Start Source Scan")
-
-		this.#model.startSourceScan();
 	}
 
 	sourceClicked(evt) {
