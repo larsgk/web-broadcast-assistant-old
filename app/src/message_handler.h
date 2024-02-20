@@ -28,6 +28,8 @@ enum message_sub_type {
 	MESSAGE_SUBTYPE_STOP_SCAN         = 0x03,
 	MESSAGE_SUBTYPE_CONNECT_SINK      = 0x04,
 
+	MESSAGE_SUBTYPE_RESET             = 0x2A,
+
 	MESSAGE_SUBTYPE_DUMMY             = 0x7F,
 
 	/* EVT (bit7 = 1) */
@@ -45,6 +47,7 @@ struct webusb_message {
 	uint8_t payload[MAX_MSG_PAYLOAD_LEN];
 } __packed;
 
+void send_event(enum message_sub_type type);
 void message_handler(struct webusb_message *msg_ptr, uint16_t msg_length);
 void message_handler_init(void);
 

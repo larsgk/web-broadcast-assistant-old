@@ -21,8 +21,9 @@
 
 int scan_for_broadcast_source(uint8_t seq_no);
 int scan_for_broadcast_sink(uint8_t seq_no);
-int stop_scanning(uint8_t seq_no);
+int stop_scanning();
 int connect_to_sink(uint8_t seq_no, uint16_t msg_length, uint8_t *payload);
 int broadcast_assistant_init(void);
+int disconnect_unpair_all();
 
 #endif /* __BROADCAST_ASSISTANT_H__ */

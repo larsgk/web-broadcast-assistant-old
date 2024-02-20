@@ -359,7 +359,7 @@ int scan_for_broadcast_sink(uint8_t seq_no)
 	return 0;
 }
 
-int stop_scanning(uint8_t seq_no)
+int stop_scanning()
 {
 	if (ba_state == BROADCAST_ASSISTANT_STATE_IDLE) {
 		/* No scan ongoing */
@@ -375,6 +375,40 @@ int stop_scanning(uint8_t seq_no)
 	LOG_INF("Scanning stopped");
 
 	ba_state = BROADCAST_ASSISTANT_STATE_IDLE;
+
+	return 0;
+}
+
+static void disconnect(struct bt_conn *conn, void *data)
+{
+	char addr[BT_ADDR_LE_STR_LEN];
+	int err;
+
+	bt_addr_le_to_str(bt_conn_get_dst(conn), addr, sizeof(addr));
+
+	LOG_INF("Disconnecting from %s", addr);
+	err = bt_conn_disconnect(conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+	if (err) {
+		LOG_INF("Failed to disconnect from %s", addr);
+	}
+}
+
+int disconnect_unpair_all()
+{
+	int err = 0;
+
+	LOG_INF("Disconnecting and unpairing all devices");
+
+	bt_conn_foreach(BT_CONN_TYPE_LE, disconnect, NULL);
+
+	LOG_INF("Disconnecting complete");
+
+	err = bt_unpair(BT_ID_DEFAULT, NULL);
+	if (err != 0) {
+		LOG_ERR("bt_unpair failed with %d", err);
+	}
+
+	LOG_INF("Unpair complete");
 
 	return 0;
 }
