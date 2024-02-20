@@ -103,6 +103,12 @@ export class AssistantModel extends EventTarget {
 				])?.value,
 				broadcast_name: tvArrayFindItem(payloadArray, [
 					BT_DataType.BT_DATA_BROADCAST_NAME
+				])?.value,
+				pa_interval: tvArrayFindItem(payloadArray, [
+					BT_DataType.BT_DATA_PA_INTERVAL
+				])?.value,
+				sid: tvArrayFindItem(payloadArray, [
+					BT_DataType.BT_DATA_SID
 				])?.value
 			}
 
