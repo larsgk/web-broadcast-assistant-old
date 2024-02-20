@@ -47,7 +47,8 @@ struct webusb_message {
 	uint8_t payload[MAX_MSG_PAYLOAD_LEN];
 } __packed;
 
-void send_event(enum message_sub_type type);
+void send_response(enum message_sub_type stype, uint8_t seq_no, int32_t rc);
+void send_event(enum message_sub_type stype, int32_t rc);
 void message_handler(struct webusb_message *msg_ptr, uint16_t msg_length);
 void message_handler_init(void);
 
