@@ -164,20 +164,25 @@ export class AssistantModel extends EventTarget {
 
 		switch (message.subType) {
 			case MessageSubType.START_SINK_SCAN:
+			console.log('START_SINK_SCAN response received');
 			this.dispatchEvent(new CustomEvent('sink-scan-started'));
 			break;
 			case MessageSubType.START_SOURCE_SCAN:
+			console.log('START_SOURCE_SCAN response received');
 			this.dispatchEvent(new CustomEvent('source-scan-started'));
 			break;
 			case MessageSubType.STOP_SCAN:
+			console.log('STOP_SCAN response received');
 			this.dispatchEvent(new CustomEvent('scan-stopped'));
 			break;
 			case MessageSubType.CONNECT_SINK:
-			// TODO
 			console.log('CONNECT_SINK response received');
 			break;
+			case MessageSubType.RESET:
+			console.log('RESET resonse received');
+			break;
 			default:
-			console.log(`Missing handler for subType 0x${message.subType.toString(16)}`);
+			console.log(`Missing handler for RES subType 0x${message.subType.toString(16)}`);
 		}
 
 	}
@@ -192,8 +197,12 @@ export class AssistantModel extends EventTarget {
 			case MessageSubType.SOURCE_FOUND:
 			this.handleSourceFound(message);
 			break;
+			case MessageSubType.STOP_SCAN:
+			console.log('STOP_SCAN response received');
+			this.dispatchEvent(new CustomEvent('scan-stopped'));
+			break;
 			default:
-			console.log(`Missing handler for subType 0x${message.subType.toString(16)}`);
+			console.log(`Missing handler for EVT subType 0x${message.subType.toString(16)}`);
 		}
 	}
 
@@ -220,6 +229,19 @@ export class AssistantModel extends EventTarget {
 			default:
 			console.log(`Could not interpret message with type ${message.type}`);
 		}
+	}
+
+	resetBA() {
+		console.log("Sending Reset CMD")
+
+		const message = {
+			type: Number(MessageType.CMD),
+			subType: MessageSubType.RESET,
+			seqNo: 123,
+			payload: new Uint8Array([])
+		};
+
+		this.#service.sendCMD(message)
 	}
 
 	startSinkScan() {

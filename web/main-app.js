@@ -98,7 +98,7 @@ export class MainApp extends HTMLElement {
 
 		const shadowRoot = this.attachShadow({mode: 'open'});
 
-
+		this.sendReset = this.sendReset.bind(this);
 		this.scanStopped = this.scanStopped.bind(this);
 		this.sinkScanStarted = this.sinkScanStarted.bind(this);
 		this.sourceScanStarted = this.sourceScanStarted.bind(this);
@@ -123,21 +123,28 @@ export class MainApp extends HTMLElement {
 
 		button?.addEventListener('click', WebUSBDeviceService.scan);
 
+		WebUSBDeviceService.addEventListener('connected', this.sendReset);
+
 		this.#stopScanButton = this.shadowRoot?.querySelector('#stop_scan');
 		this.#stopScanButton.addEventListener('click', this.sendStopScan);
 		this.#stopScanButton.addEventListener('click', this.sendStopScan);
-		// TODO: Re-enable this line when we have a "reset on USB connect" function
-		//this.#stopScanButton.disabled = true;
+		this.#stopScanButton.disabled = true;
 
 		this.#scanSinkButton = this.shadowRoot?.querySelector('#sink_scan');
 		this.#scanSinkButton.addEventListener('click', this.sendStartSinkScan);
+		this.#scanSinkButton.disabled = true;
 
 		this.#scanSourceButton = this.shadowRoot?.querySelector('#source_scan');
 		this.#scanSourceButton.addEventListener('click', this.sendStartSourceScan);
+		this.#scanSourceButton.disabled = true;
 
 		this.#model.addEventListener('scan-stopped', this.scanStopped);
 		this.#model.addEventListener('sink-scan-started', this.sinkScanStarted);
 		this.#model.addEventListener('source-scan-started', this.sourceScanStarted);
+	}
+
+	sendReset() {
+		this.#model.resetBA();
 	}
 
 	scanStopped() {
