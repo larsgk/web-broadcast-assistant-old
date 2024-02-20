@@ -163,7 +163,7 @@ const addressStringToArray = (str) => {
 	return str.split(':').map(v => Number.parseInt(v, 16));
 }
 
-const bufToSignedInt = (data) => {
+const bufToInt = (data, signed) => {
 	if (!(data instanceof Uint8Array)) {
 		throw new Error("Input data must be a Uint8Array");
 	}
@@ -180,10 +180,14 @@ const bufToSignedInt = (data) => {
 		count++;
 	}
 
-	const neg = item & (1 << (width - 1));
-	const tmp = (1 << width);
-	const min = -tmp;
-	return neg ? min + (item & (tmp - 1)) : item;
+	if (signed) {
+		const neg = item & (1 << (width - 1));
+		const tmp = (1 << width);
+		const min = -tmp;
+		return neg ? min + (item & (tmp - 1)) : item;
+	}
+
+	return item;
 }
 
 const bufToValueArray = (data, itemsize) => {
@@ -245,7 +249,11 @@ const parseLTVItem = (type, len, value) => {
 		item.value = bufToAddressString(value)
 		break;
 		case BT_DataType.BT_DATA_RSSI:
-		item.value = bufToSignedInt(value);
+		item.value = bufToInt(value, true);
+		break;
+		case BT_DataType.BT_DATA_PA_INTERVAL:
+		case BT_DataType.BT_DATA_SID:
+		item.value = bufToInt(value, false);
 		break;
 		default:
 		item.value = "UNHANDLED";
@@ -304,6 +312,7 @@ export const tvArrayToLtv = arr => {
 			continue;
 		}
 
+		// TODO: Add handlers for types needed for commands.
 		switch (type) {
 			case BT_DataType.BT_DATA_PUB_TARGET_ADDR:
 			case BT_DataType.BT_DATA_RAND_TARGET_ADDR:
