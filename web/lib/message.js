@@ -17,9 +17,9 @@ import { arrayToHex } from './helpers.js';
 */
 
 export const MessageType = Object.freeze({
-	CMD: 1,
-	RES: 2,
-	EVT: 3
+	CMD: 0x01,
+	RES: 0x02,
+	EVT: 0x03
 });
 
 export const MessageSubType = Object.freeze({
@@ -335,4 +335,18 @@ export const tvArrayFindItem = (arr, types) => {
 	// This will find and return the first value, matching any type given
 
 	return arr.find(item => types.includes(item.type));
+}
+
+const keyName = (obj, val) => {
+	return Object.entries(obj).find(i => i[1] === val)?.[0];
+}
+
+export const logString = (message) => {
+	const ts = (new Date()).toISOString().substring(11,23); // "HH:mm:ss.sss"
+
+	const typeName = keyName(MessageType, message.type);
+	const subTypeName = keyName(MessageSubType, message.subType);
+
+	// TODO: Expand with relevant content
+	return `[${ts}] ${typeName} ${subTypeName}`;
 }

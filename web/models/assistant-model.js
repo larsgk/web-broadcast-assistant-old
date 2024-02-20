@@ -160,7 +160,7 @@ export class AssistantModel extends EventTarget {
 	}
 
 	handleRES(message) {
-		console.log(`Response message with subType 0x${message.subType.toString}`);
+		console.log(`Response message with subType 0x${message.subType.toString(16)}`);
 
 		switch (message.subType) {
 			case MessageSubType.START_SINK_SCAN:

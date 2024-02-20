@@ -5,6 +5,7 @@ import './components/source-device-list.js';
 
 import * as AssistantModel from './models/assistant-model.js';
 import { WebUSBDeviceService } from './services/webusb-device-service.js';
+import { logString } from './lib/message.js';
 
 const template = document.createElement('template');
 template.innerHTML = `
@@ -63,6 +64,25 @@ button:disabled {
 	background-color: red;
 }
 
+.textbox {
+	box-sizing: border-box;
+	border: 1px solid darkgray;
+	height: 5em;
+	overflow-y: auto;
+	white-space: pre-line;
+	font-family: monospace;
+	font-size: smaller;
+	transition: height 0.2s ease-out;
+}
+
+.textbox:hover, .textbox.expanded {
+	height: 30em;
+}
+
+.textbox.expanded {
+	border: 2px solid black;
+}
+
 </style>
 
 <div class="flex-container">
@@ -80,6 +100,9 @@ button:disabled {
 			<!-- broadcast source components... -->
 			<button id="source_scan">Scan for sources</button>
 			<source-device-list></source-device-list>
+
+			<span>Activity:</span>
+			<div id="activity" class="textbox"></div>
 		</div>
 	</div>
 </div>
@@ -113,6 +136,26 @@ export class MainApp extends HTMLElement {
 		this.#model = AssistantModel.initializeAssistantModel(WebUSBDeviceService);
 	}
 
+	initializeLogging(el) {
+		if (!(el instanceof HTMLElement)) {
+			return;
+		}
+
+		const addToLog = evt => {
+			const { message } = evt.detail;
+			// TBD: Change the crude prepend if performing bad on large content
+			el.textContent = logString(message) + '\n' + el.textContent;
+			console.log(logString(message));
+		}
+
+		WebUSBDeviceService.addEventListener('message', addToLog);
+		WebUSBDeviceService.addEventListener('command-sent', addToLog);
+
+		el.addEventListener('click', () => {
+			el.classList.toggle('expanded');
+		});
+	}
+
 	connectedCallback() {
 		console.log("connectedCallback - MainApp");
 
@@ -141,6 +184,8 @@ export class MainApp extends HTMLElement {
 		this.#model.addEventListener('scan-stopped', this.scanStopped);
 		this.#model.addEventListener('sink-scan-started', this.sinkScanStarted);
 		this.#model.addEventListener('source-scan-started', this.sourceScanStarted);
+
+		this.initializeLogging(this.shadowRoot?.querySelector('#activity'));
 	}
 
 	sendReset() {
