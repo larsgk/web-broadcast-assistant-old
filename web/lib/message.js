@@ -41,24 +41,26 @@ export const MessageSubType = Object.freeze({
 });
 
 export const BT_DataType = Object.freeze({
-	BT_DATA_UUID16_SOME:		0x02,
-	BT_DATA_UUID16_ALL:		0x03,
-	BT_DATA_UUID32_SOME:		0x04,
-	BT_DATA_UUID32_ALL:		0x05,
+	BT_DATA_UUID16_SOME:		0x02,	// uint16[n]
+	BT_DATA_UUID16_ALL:		0x03,	// uint16[n]
+	BT_DATA_UUID32_SOME:		0x04,	// uint32[n]
+	BT_DATA_UUID32_ALL:		0x05,	// uint32[n]
 
-	BT_DATA_NAME_SHORTENED:		0x08,
-	BT_DATA_NAME_COMPLETE:		0x09,
+	BT_DATA_NAME_SHORTENED:		0x08,	// utf8 (variable len)
+	BT_DATA_NAME_COMPLETE:		0x09,	// utf8 (variable len)
 
 	BT_DATA_SVC_DATA16:		0x16,
-	BT_DATA_PUB_TARGET_ADDR:	0x17,
-	BT_DATA_RAND_TARGET_ADDR:	0x18,
+	BT_DATA_PUB_TARGET_ADDR:	0x17,	// uint8[6]
+	BT_DATA_RAND_TARGET_ADDR:	0x18,	// uint8[6]
 
-	BT_DATA_BROADCAST_NAME:		0x30,
+	BT_DATA_BROADCAST_NAME:		0x30,	// utf8 (variable len)
 
 	// The following types are created for this app (not standard)
-	BT_DATA_PA_INTERVAL:		0xfc,
-	BT_DATA_SID:			0xfd,
-	BT_DATA_RSSI:			0xfe,
+	BT_DATA_BROADCAST_ID:		0xfa,	// uint24
+	BT_DATA_ERROR_CODE:		0xfb,	// int32
+	BT_DATA_PA_INTERVAL:		0xfc,	// uint16
+	BT_DATA_SID:			0xfd,	// uint8
+	BT_DATA_RSSI:			0xfe,	// int8
 });
 
 export const BT_UUID = Object.freeze({
@@ -154,9 +156,7 @@ const bufToAddressString = (data) => {
 		return `UNKNOWN ADDRESS`
 	}
 
-	return Array.from(data, byte => {
-		return ('0' + (byte & 0xFF).toString(16)).slice(-2);
-	}).join(':');
+	return Array.from(data, b => b.toString(16).padStart(2, '0')).join(':').toUpperCase();
 }
 
 const addressStringToArray = (str) => {
@@ -251,6 +251,7 @@ const parseLTVItem = (type, len, value) => {
 		case BT_DataType.BT_DATA_RSSI:
 		item.value = bufToInt(value, true);
 		break;
+		case BT_DataType.BT_DATA_BROADCAST_ID:
 		case BT_DataType.BT_DATA_PA_INTERVAL:
 		case BT_DataType.BT_DATA_SID:
 		item.value = bufToInt(value, false);
