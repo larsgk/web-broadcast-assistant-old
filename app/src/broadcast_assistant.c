@@ -581,7 +581,7 @@ int connect_to_sink(uint8_t seq_no, uint16_t msg_length, uint8_t *payload)
 	return 0;
 }
 
-int add_source(uint8_t seq_no, uint16_t msg_length, uint8_t *payload)
+int add_source(uint8_t sid, uint16_t pa_interval, uint32_t broadcast_id, bt_addr_le_t *addr)
 {
 	LOG_INF("Adding broadcast source...");
 
@@ -590,7 +590,27 @@ int add_source(uint8_t seq_no, uint16_t msg_length, uint8_t *payload)
 		return -1;
 	}
 
-	return 0;
+	struct bt_bap_bass_subgroup subgroup = { 0 };
+	struct bt_bap_broadcast_assistant_add_src_param param = { 0 };
+	int err = 0;
+
+	subgroup.bis_sync = BT_BAP_BIS_SYNC_NO_PREF; // We might want to hard code to BIT(1)
+
+	bt_addr_le_copy(&param.addr, addr);
+	param.adv_sid = sid;
+	param.pa_interval = pa_interval;
+	param.broadcast_id = broadcast_id;
+	param.pa_sync = true;
+
+	param.num_subgroups = 1;
+	param.subgroups = &subgroup;
+
+	err = bt_bap_broadcast_assistant_add_src(broadcast_sink_conn, &param);
+	if (err != 0) {
+		LOG_ERR("Failed to add source (err %d)", err);
+	}
+
+	return err;
 }
 
 int broadcast_assistant_init(void)
