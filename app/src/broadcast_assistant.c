@@ -98,6 +98,7 @@ static void connected(struct bt_conn *conn, uint8_t err)
 		return;
 	}
 	if (err) {
+		LOG_ERR("Connected error (err %d)", err);
 		bt_conn_unref(broadcast_sink_conn);
 		broadcast_sink_conn = NULL;
 		restart_scanning_if_needed();
