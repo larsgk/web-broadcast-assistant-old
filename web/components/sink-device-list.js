@@ -58,6 +58,7 @@ export class SinkDeviceList extends HTMLElement {
 
 		this.#model.addEventListener('sink-found', this.sinkFound)
 		this.#model.addEventListener('sink-updated', this.sinkUpdated)
+		this.#model.addEventListener('reset', () => { this.#list.replaceChildren()})
 	}
 
 	disconnectedCallback() {
