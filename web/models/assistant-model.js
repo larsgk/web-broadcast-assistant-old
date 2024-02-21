@@ -299,6 +299,12 @@ export class AssistantModel extends EventTarget {
 	addSource(source) {
 		console.log("Sending Add Source CMD");
 
+		const { addr } = source;
+
+		if (!addr) {
+			throw Error("Address not found in source object!");
+		}
+
 		const sidItem = { type: BT_DataType.BT_DATA_SID, value: source.sid };
 		console.log(sidItem);
 
@@ -312,6 +318,7 @@ export class AssistantModel extends EventTarget {
 			{ type: BT_DataType.BT_DATA_SID, value: source.sid },
 			{ type: BT_DataType.BT_DATA_PA_INTERVAL, value: source.pa_interval },
 			{ type: BT_DataType.BT_DATA_BROADCAST_ID, value: source.broadcast_id },
+			addr,
 		];
 
 		const payload = tvArrayToLtv(tvArr);
