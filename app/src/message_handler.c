@@ -111,22 +111,17 @@ bool ltv_found(struct bt_data *data, void *user_data)
 		LOG_DBG("BT_DATA_BROADCAST_ID");
 		return true;
 	case BT_DATA_PUB_TARGET_ADDR:
-		_parsed->addr.type = BT_ADDR_LE_PUBLIC;
-		memcpy(_parsed->addr.a.val, data->data, sizeof(bt_addr_t));
-		LOG_DBG("BT_ADDR_LE_PUBLIC");
-		return true;
 	case BT_DATA_RAND_TARGET_ADDR:
 		char addr_str[BT_ADDR_LE_STR_LEN];
 
-		_parsed->addr.type = BT_ADDR_LE_RANDOM;
+		_parsed->addr.type = data->type == BT_DATA_PUB_TARGET_ADDR ? BT_ADDR_LE_PUBLIC
+									   : BT_ADDR_LE_RANDOM;
 		memcpy(_parsed->addr.a.val, data->data, sizeof(bt_addr_t));
+		LOG_DBG("BT_DATA_PUB_TARGET_ADDR/BT_DATA_RAND_TARGET_ADDR");
 
-		LOG_DBG("BT_ADDR_LE_RANDOM");
 		bt_addr_le_to_str(&_parsed->addr, addr_str, sizeof(addr_str));
-
-		LOG_INF("Addr: %s", addr_str);
+		LOG_DBG("Addr: %s", addr_str);
 		return true;
-
 	default:
 		LOG_DBG("Unknown type");
 	}
@@ -191,13 +186,13 @@ void message_handler(struct webusb_message *msg_ptr, uint16_t msg_length)
 
 	case MESSAGE_SUBTYPE_CONNECT_SINK:
 		LOG_DBG("MESSAGE_SUBTYPE_CONNECT_SINK (len %u)", msg_length);
-		msg_rc = connect_to_sink(msg_seq_no, msg_length, &msg_ptr->payload[0]);
+		msg_rc = connect_to_sink(&parsed_ltv_data.addr);
 		send_response(MESSAGE_SUBTYPE_CONNECT_SINK, msg_seq_no, msg_rc);
 		break;
 
 	case MESSAGE_SUBTYPE_DISCONNECT_SINK:
 		LOG_DBG("MESSAGE_SUBTYPE_DISCONNECT_SINK (len %u)", msg_length);
-		msg_rc = disconnect_from_sink(msg_seq_no, msg_length, &msg_ptr->payload[0]);
+		msg_rc = disconnect_from_sink(&parsed_ltv_data.addr);
 		send_response(MESSAGE_SUBTYPE_DISCONNECT_SINK, msg_seq_no, msg_rc);
 		break;
 

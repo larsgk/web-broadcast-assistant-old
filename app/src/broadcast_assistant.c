@@ -39,8 +39,6 @@ struct scan_recv_data {
 	bool has_pacs;
 };
 
-static enum broadcast_assistant_state ba_state;
-
 static void broadcast_assistant_discover_cb(struct bt_conn *conn, int err, uint8_t recv_state_count);
 static void broadcast_assistant_add_src_cb(struct bt_conn *conn, int err);
 static void connected(struct bt_conn *conn, uint8_t err);
@@ -54,7 +52,6 @@ static bool scan_for_sink(const struct bt_le_scan_recv_info *info, struct net_bu
 			  struct scan_recv_data *sr_data);
 static void scan_recv_cb(const struct bt_le_scan_recv_info *info, struct net_buf_simple *ad);
 static void scan_timeout_cb(void);
-static bool get_bt_le_addr_from_payload(uint16_t msg_length, uint8_t *payload, bt_addr_le_t *bt_addr_le);
 
 static struct bt_le_scan_cb scan_callbacks = {
 	.recv = scan_recv_cb,
@@ -72,7 +69,9 @@ BT_CONN_CB_DEFINE(conn_callbacks) = {
 	.security_changed = security_changed_cb
 };
 
-static struct bt_conn *broadcast_sink_conn; /* TODO: Make a list of sinks */
+static struct bt_conn *ba_sink_conn; /* TODO: Make a list of sinks */
+static enum broadcast_assistant_state ba_state;
+
 
 /*
  * Private functions
@@ -106,13 +105,13 @@ static void connected(struct bt_conn *conn, uint8_t err)
 {
 	LOG_INF("Broadcast assistant connected callback (%p, err:%d)", (void *)conn, err);
 
-	if (conn != broadcast_sink_conn) {
+	if (conn != ba_sink_conn) {
 		return;
 	}
 	if (err) {
 		LOG_ERR("Connected error (err %d)", err);
-		bt_conn_unref(broadcast_sink_conn);
-		broadcast_sink_conn = NULL;
+		bt_conn_unref(ba_sink_conn);
+		ba_sink_conn = NULL;
 		send_event(MESSAGE_SUBTYPE_SINK_CONNECTED, err);
 		restart_scanning_if_needed();
 		return;
@@ -120,10 +119,10 @@ static void connected(struct bt_conn *conn, uint8_t err)
 
 	/* Connected. Do BAP broadcast assistant discover */
 	LOG_INF("Broadcast assistant discover");
-	err = bt_bap_broadcast_assistant_discover(broadcast_sink_conn);
+	err = bt_bap_broadcast_assistant_discover(ba_sink_conn);
 	if (err) {
 		LOG_ERR("Broadcast assistant discover (err %d)", err);
-		err = bt_conn_disconnect(broadcast_sink_conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+		err = bt_conn_disconnect(ba_sink_conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
 		if (err) {
 			LOG_ERR("Failed to disconnect (err %d)", err);
 			send_event(MESSAGE_SUBTYPE_SINK_CONNECTED, -1);
@@ -136,12 +135,12 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 {
 	LOG_INF("Broadcast assistant disconnected callback (%p, reason:%d)", (void *)conn, reason);
 
-	if (conn != broadcast_sink_conn) {
+	if (conn != ba_sink_conn) {
 		return;
 	}
 
-	bt_conn_unref(broadcast_sink_conn);
-	broadcast_sink_conn = NULL;
+	bt_conn_unref(ba_sink_conn);
+	ba_sink_conn = NULL;
 
 	send_event(MESSAGE_SUBTYPE_SINK_DISCONNECTED, reason);
 }
@@ -442,29 +441,6 @@ static void scan_timeout_cb(void)
 	send_event(MESSAGE_SUBTYPE_STOP_SCAN, 0);
 }
 
-static bool get_bt_le_addr_from_payload(uint16_t msg_length, uint8_t *payload, bt_addr_le_t *bt_addr_le)
-{
-	if (msg_length != (offsetof(struct webusb_message, payload) + 1 /* len */ + 1 /* type */ +
-			   BT_ADDR_SIZE)) {
-		LOG_ERR("Invalid payload");
-		return false;
-	}
-	if (payload[0] != BT_ADDR_LE_SIZE) {
-		LOG_ERR("Invalid payload length %d", payload[0]);
-		return false;
-	}
-	if (payload[1] != BT_DATA_PUB_TARGET_ADDR && payload[1] != BT_DATA_RAND_TARGET_ADDR) {
-		LOG_ERR("Invalid bt addr type %d", payload[1]);
-		return false;
-	}
-
-	bt_addr_le->type =
-		payload[1] == BT_DATA_PUB_TARGET_ADDR ? BT_ADDR_LE_PUBLIC : BT_ADDR_LE_RANDOM;
-	memcpy(&bt_addr_le->a.val[0], &payload[2], BT_ADDR_SIZE);
-
-	return true;
-}
-
 /*
  * Public functions
  */
@@ -557,21 +533,12 @@ int disconnect_unpair_all(void)
 	return 0;
 }
 
-int connect_to_sink(uint8_t seq_no, uint16_t msg_length, uint8_t *payload)
+int connect_to_sink(bt_addr_le_t *bt_addr_le)
 {
 	char addr_str[BT_ADDR_LE_STR_LEN];
-	bt_addr_le_t bt_addr_le;
 	int err;
 
-	/* Parse paylad data. Assume only BT_DATA_PUB_TARGET_ADDR or BT_DATA_RAND_TARGET_ADDR
-	 * present. TODO: use bt_data_parse
-	 */
-	if (!get_bt_le_addr_from_payload(msg_length, payload, &bt_addr_le)) {
-		/* Address LTV not present */
-		return -EFAULT;
-	}
-
-	if (broadcast_sink_conn) {
+	if (ba_sink_conn) {
 		/* Sink already connected. TODO: Support multiple sinks*/
 		return -EAGAIN;
 	}
@@ -591,11 +558,11 @@ int connect_to_sink(uint8_t seq_no, uint16_t msg_length, uint8_t *payload)
 		break;
 	}
 
-	bt_addr_le_to_str(&bt_addr_le, addr_str, sizeof(addr_str));
+	bt_addr_le_to_str(bt_addr_le, addr_str, sizeof(addr_str));
 	LOG_INF("Connecting to %s...", addr_str);
 
-	err = bt_conn_le_create(&bt_addr_le, BT_CONN_LE_CREATE_CONN, BT_LE_CONN_PARAM_DEFAULT,
-				&broadcast_sink_conn);
+	err = bt_conn_le_create(bt_addr_le, BT_CONN_LE_CREATE_CONN, BT_LE_CONN_PARAM_DEFAULT,
+				&ba_sink_conn);
 	if (err) {
 		LOG_ERR("Failed creating connection (err=%d)", err);
 		restart_scanning_if_needed();
@@ -606,28 +573,19 @@ int connect_to_sink(uint8_t seq_no, uint16_t msg_length, uint8_t *payload)
 	return 0;
 }
 
-int disconnect_from_sink(uint8_t seq_no, uint16_t msg_length, uint8_t *payload)
+int disconnect_from_sink(bt_addr_le_t *bt_addr_le)
 {
 	char addr_str[BT_ADDR_LE_STR_LEN];
-	bt_addr_le_t bt_addr_le;
 	int err;
 
-	/* Parse paylad data. Assume only BT_DATA_PUB_TARGET_ADDR or BT_DATA_RAND_TARGET_ADDR
-	 * present. TODO: use bt_data_parse
-	 */
-	if (!get_bt_le_addr_from_payload(msg_length, payload, &bt_addr_le)) {
-		/* Address LTV not present */
-		return -EFAULT;
-	}
-
-	bt_addr_le_to_str(&bt_addr_le, addr_str, sizeof(addr_str));
+	bt_addr_le_to_str(bt_addr_le, addr_str, sizeof(addr_str));
 	LOG_INF("Disconnecting from %s...", addr_str);
 
 	/* TODO: Support multiple sinks. Search for conn to disconnect via
 	 * bt_conn_foreach(BT_CONN_TYPE_LE, disconnect, NULL).
 	 */
-	if (broadcast_sink_conn) {
-		err = bt_conn_disconnect(broadcast_sink_conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+	if (ba_sink_conn) {
+		err = bt_conn_disconnect(ba_sink_conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
 		if (err) {
 			LOG_ERR("Failed to disconnect (err %d)", err);
 			send_event(MESSAGE_SUBTYPE_SINK_DISCONNECTED, -1);
@@ -659,12 +617,12 @@ int add_source(uint8_t sid, uint16_t pa_interval, uint32_t broadcast_id, bt_addr
 	param.num_subgroups = 1;
 	param.subgroups = &subgroup;
 
-	if (!broadcast_sink_conn) {
+	if (!ba_sink_conn) {
 		LOG_INF("No sink connected!");
 		return -ENOTCONN;
 	}
 
-	err = bt_bap_broadcast_assistant_add_src(broadcast_sink_conn, &param);
+	err = bt_bap_broadcast_assistant_add_src(ba_sink_conn, &param);
 	if (err != 0) {
 		LOG_ERR("Failed to add source (err %d)", err);
 		return err;
@@ -675,7 +633,7 @@ int add_source(uint8_t sid, uint16_t pa_interval, uint32_t broadcast_id, bt_addr
 
 int broadcast_assistant_init(void)
 {
-	broadcast_sink_conn = NULL;
+	ba_sink_conn = NULL;
 
 	int err = bt_enable(NULL);
 	if (err) {
