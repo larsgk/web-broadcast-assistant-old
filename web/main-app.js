@@ -12,25 +12,44 @@ template.innerHTML = `
 <style>
 .flex-container {
 	display: flex;
-	height: 100%;
+	font-family: sans-serif;
+	font-optical-sizing: auto;
+	font-weight: 400;
+	font-style: normal;
+
+	padding-bottom: 100px;
+}
+
+.activity-container {
+	position: fixed;
+	width: 100vw;
+	bottom: 10px;
+	display: flex;
+	height: auto;
+
+	font-family: sans-serif;
+	font-optical-sizing: auto;
+	font-weight: 400;
+	font-style: normal;
 }
 
 .content {
 	margin: auto;
 	position: relative;
-	width: 95%;
+	width: 90%;
 	max-width: 700px;
 }
 
 .col {
 	display: flex;
 	flex-direction: column;
+	gap: 10px;
 }
 
 .row {
 	display: flex;
 	flex-direction: row;
-	flex-wrap: wrap;
+	gap: 10px;
 }
 
 button {
@@ -39,34 +58,44 @@ button {
 	box-sizing: border-box;
 	min-width: 5.14em;
         width: 100%;
-	margin: 0.2em;
+	// margin: 0.2em;
 	background: transparent;
 	text-align: center;
 	font: inherit;
 	text-transform: uppercase;
 	outline: none;
+	border: 0;
 	border-radius: 5px;
 	user-select: none;
 	cursor: pointer;
 	z-index: 0;
 	padding: 0.7em 0.57em;
-	box-shadow: 0 2px 2px 0 rgba(0,0,0,0.14), 0 1px 5px 0 rgba(0,0,0,0.12), 0 3px 1px -2px rgba(0,0,0,0.2);
-	background-color: var(--background-color, darkgray);
-	color: white;
+	// box-shadow: 0 2px 2px 0 rgba(0,0,0,0.14), 0 1px 5px 0 rgba(0,0,0,0.12), 0 3px 1px -2px rgba(0,0,0,0.2);
+	box-shadow: 3px 3px 6px 3px gray;
+	background-color: var(--background-color, );
+	color: black;
+	transition: box-shadow 0.1s ease-out;
       }
 
-button:hover {
-	box-shadow: 0 3px 3px 0 rgba(0,0,0,0.14), 0 1px 7px 0 rgba(0,0,0,0.12), 0 3px 1px -1px rgba(0,0,0,0.2);
-	background-color: var(--background-color-hover, gray);
+button:active:not([disabled]) {
+	// box-shadow: 0 3px 3px 0 rgba(0,0,0,0.14), 0 1px 7px 0 rgba(0,0,0,0.12), 0 3px 1px -1px rgba(0,0,0,0.2);
+	box-shadow: 1px 1px 2px 3px gray;
+	// background-color: var(--background-color-hover, gray);
 }
 
 button:disabled {
-	background-color: red;
+	color: gray;
+	box-shadow: 1px 1px 2px 2px lightgray;
 }
 
 .textbox {
 	box-sizing: border-box;
 	border: 1px solid darkgray;
+
+	background: rgba(255, 255, 255, 0.8);
+	backdrop-filter: blur;
+	box-shadow: 3px 3px 6px 3px lightgray;
+
 	height: 5em;
 	overflow-y: auto;
 	white-space: pre-line;
@@ -75,7 +104,17 @@ button:disabled {
 	transition: height 0.2s ease-out;
 }
 
-.textbox:hover, .textbox.expanded {
+@media(hover: hover) and (pointer: fine) {
+	.textbox:hover {
+		height: 30em;
+	}
+
+	button:hover:not([disabled]) {
+		background-color: #F0F0F0;
+	}
+}
+
+.textbox.expanded {
 	height: 30em;
 }
 
@@ -83,29 +122,72 @@ button:disabled {
 	border: 2px solid black;
 }
 
+#splashbox {
+	display: flex;
+	position: fixed;
+	left: 0;
+	top: 0;
+	width: 100vw;
+	height: 100vh;
+
+	background: rgba(255, 255, 255, 0.8);
+	backdrop-filter: blur(10px);
+
+	z-index: 1000;
+}
+
+#splashbox.hidden {
+	display: none;
+}
+
+.splashcontent {
+	margin: auto;
+	position: relative;
+	width: 90%;
+	max-width: 500px;
+}
+
+
+
 </style>
 
 <div class="flex-container">
 	<div class="content">
 		<div class="col">
 			<h2>WebUSB Broadcast Assistant</h2>
-			<button id='connect'>Connect to WebUSB device</button>
 
-			<button id='stop_scan'>Stop Scanning</button>
+			<div class="row">
+			<button id="sink_scan">Discover<br>Sinks</button>
+			<button id='stop_scan'>Stop<br>Scanning</button>
+			<button id="source_scan">Discover<br>Sources</button>
+			</div>
 
 			<!-- broadcast sink components... -->
-			<button id="sink_scan">Scan for sinks</button>
 			<sink-device-list></sink-device-list>
 
 			<!-- broadcast source components... -->
-			<button id="source_scan">Scan for sources</button>
 			<source-device-list></source-device-list>
+		</div>
+	</div>
+</div>
 
-			<span>Activity:</span>
+<div class="activity-container">
+	<div class="content">
+		<div class="col">
 			<div id="activity" class="textbox"></div>
 		</div>
 	</div>
 </div>
+
+<div id="splashbox">
+	<div class="splashcontent">
+		<div class="col">
+			<h2>WebUSB Broadcast Assistant</h2>
+			<button id='connect'>Connect to WebUSB device</button>
+		</div>
+	</div>
+</div>
+
 `;
 
 export class MainApp extends HTMLElement {
@@ -161,31 +243,35 @@ export class MainApp extends HTMLElement {
 
 		this.shadowRoot?.appendChild(template.content.cloneNode(true));
 
-		// Temporatily hook up the connect button here...
 		const button = this.shadowRoot?.querySelector('#connect');
-
 		button?.addEventListener('click', WebUSBDeviceService.scan);
+
+		const splashbox = this.shadowRoot?.querySelector('#splashbox');
+		WebUSBDeviceService.addEventListener('connected', () => { splashbox?.classList.add('hidden') });
+		WebUSBDeviceService.addEventListener('disconnected', () => { splashbox?.classList.remove('hidden') });
 
 		WebUSBDeviceService.addEventListener('connected', this.sendReset);
 
 		this.#stopScanButton = this.shadowRoot?.querySelector('#stop_scan');
 		this.#stopScanButton.addEventListener('click', this.sendStopScan);
 		this.#stopScanButton.addEventListener('click', this.sendStopScan);
-		this.#stopScanButton.disabled = true;
+		// this.#stopScanButton.disabled = true;
 
 		this.#scanSinkButton = this.shadowRoot?.querySelector('#sink_scan');
 		this.#scanSinkButton.addEventListener('click', this.sendStartSinkScan);
-		this.#scanSinkButton.disabled = true;
+		// this.#scanSinkButton.disabled = true;
 
 		this.#scanSourceButton = this.shadowRoot?.querySelector('#source_scan');
 		this.#scanSourceButton.addEventListener('click', this.sendStartSourceScan);
-		this.#scanSourceButton.disabled = true;
+		// this.#scanSourceButton.disabled = true;
 
 		this.#model.addEventListener('scan-stopped', this.scanStopped);
 		this.#model.addEventListener('sink-scan-started', this.sinkScanStarted);
 		this.#model.addEventListener('source-scan-started', this.sourceScanStarted);
 
 		this.initializeLogging(this.shadowRoot?.querySelector('#activity'));
+
+		WebUSBDeviceService.reconnectPairedDevices();
 	}
 
 	sendReset() {

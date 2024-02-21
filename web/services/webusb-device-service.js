@@ -25,6 +25,25 @@ export const WebUSBDeviceService = new class extends EventTarget {
 		this.scan = this.scan.bind(this);
 		this.sendCMD = this.sendCMD.bind(this);
 		this.sendData = this.sendData.bind(this);
+
+		navigator.usb.addEventListener("disconnect", (event) => {
+			const { device } = event;
+
+			if (device === this.#device) {
+				console.log("Disconnected ", device);
+				this.dispatchEvent(new CustomEvent('disconnected', { detail: { device: this.#device }}));
+			}
+		});
+
+		navigator.usb.addEventListener('connect', evt => this._openDevice(evt.device));
+	}
+
+	async reconnectPairedDevices() {
+		const availableDevices = await navigator.usb.getDevices();
+
+		if (availableDevices.length) {
+		    this._openDevice(availableDevices[0]);
+		}
 	}
 
 	scan() {
@@ -41,6 +60,11 @@ export const WebUSBDeviceService = new class extends EventTarget {
 		} = this.#device.configuration.interfaces[0].alternate.endpoints[0]
 		this.#device.transferIn(endpointNumber, MAX_BYTES_READ).then(result => {
 			const buf = new Uint8Array(result.data.buffer);
+
+			if (buf.length === 0) {
+				console.log("Probably rebooted. Disconnecting!");
+				this.#device.close();
+			}
 
 			this.dispatchEvent(new CustomEvent('raw-data-received', {detail: { buf }}));
 
