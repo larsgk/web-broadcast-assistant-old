@@ -24,6 +24,7 @@ int scan_for_broadcast_source(uint8_t seq_no);
 int scan_for_broadcast_sink(uint8_t seq_no);
 int stop_scanning(void);
 int connect_to_sink(uint8_t seq_no, uint16_t msg_length, uint8_t *payload);
+int disconnect_from_sink(uint8_t seq_no, uint16_t msg_length, uint8_t *payload);
 int add_source(uint8_t seq_no, uint16_t msg_length, uint8_t *payload);
 int broadcast_assistant_init(void);
 int disconnect_unpair_all(void);

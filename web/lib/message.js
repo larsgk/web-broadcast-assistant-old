@@ -28,7 +28,8 @@ export const MessageSubType = Object.freeze({
 	START_SOURCE_SCAN:	0x02,
 	STOP_SCAN:		0x03,
 	CONNECT_SINK:		0x04,
-	ADD_SOURCE:		0x05,
+	DISCONNECT_SINK:	0x05,
+	ADD_SOURCE:		0x06,
 
 	RESET:			0x2A,
 
@@ -37,6 +38,9 @@ export const MessageSubType = Object.freeze({
 	// EVT (MSB = 1)
 	SINK_FOUND:		0x81,
 	SOURCE_FOUND:		0x82,
+	SINK_CONNECTED:		0x83,
+	SINK_DISCONNECTED:	0x84,
+	SOURCE_ADDED:		0x85,
 
 	HEARTBEAT:		0xFF,
 });
