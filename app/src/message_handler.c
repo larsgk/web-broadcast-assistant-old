@@ -130,6 +130,12 @@ void message_handler(struct webusb_message *msg_ptr, uint16_t msg_length)
 		send_response(MESSAGE_SUBTYPE_CONNECT_SINK, msg_seq_no, msg_rc);
 		break;
 
+	case MESSAGE_SUBTYPE_DISCONNECT_SINK:
+		LOG_DBG("MESSAGE_SUBTYPE_DISCONNECT_SINK (len %u)", msg_length);
+		msg_rc = disconnect_from_sink(msg_seq_no, msg_length, &msg_ptr->payload[0]);
+		send_response(MESSAGE_SUBTYPE_DISCONNECT_SINK, msg_seq_no, msg_rc);
+		break;
+
 	case MESSAGE_SUBTYPE_ADD_SOURCE:
 		LOG_DBG("MESSAGE_SUBTYPE_ADD_SOURCE (len %u)", msg_length);
 		msg_rc = add_source(msg_seq_no, msg_length, &msg_ptr->payload[0]);
