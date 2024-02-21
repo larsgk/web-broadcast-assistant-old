@@ -186,6 +186,10 @@ export class AssistantModel extends EventTarget {
 			case MessageSubType.CONNECT_SINK:
 			console.log('CONNECT_SINK response received');
 			break;
+			case MessageSubType.ADD_SOURCE:
+			console.log('ADD_SOURCE response received');
+			// NOOP/TODO
+			break;
 			case MessageSubType.RESET:
 			console.log('RESET response received');
 			this.dispatchEvent(new CustomEvent('scan-stopped'));
@@ -290,6 +294,38 @@ export class AssistantModel extends EventTarget {
 		};
 
 		this.#service.sendCMD(message)
+	}
+
+	addSource(source) {
+		console.log("Sending Add Source CMD");
+
+		const sidItem = { type: BT_DataType.BT_DATA_SID, value: source.sid };
+		console.log(sidItem);
+
+		const intervalItem = { type: BT_DataType.BT_DATA_PA_INTERVAL, value: source.pa_interval };
+		console.log(intervalItem);
+
+		const bidItem = { type: BT_DataType.BT_DATA_BROADCAST_ID, value: source.broadcast_id };
+		console.log(bidItem);
+
+		const tvArr = [
+			{ type: BT_DataType.BT_DATA_SID, value: source.sid },
+			{ type: BT_DataType.BT_DATA_PA_INTERVAL, value: source.pa_interval },
+			{ type: BT_DataType.BT_DATA_BROADCAST_ID, value: source.broadcast_id },
+		];
+
+		const payload = tvArrayToLtv(tvArr);
+
+		console.log('Add Source payload', payload)
+
+		const message = {
+			type: Number(MessageType.CMD),
+			subType: MessageSubType.ADD_SOURCE,
+			seqNo: 123,
+			payload
+		};
+
+		this.#service.sendCMD(message);
 	}
 
 	connectToSink(sink) {

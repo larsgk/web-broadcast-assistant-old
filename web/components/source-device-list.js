@@ -42,6 +42,7 @@ export class SourceDeviceList extends HTMLElement {
 
 		this.sourceFound = this.sourceFound.bind(this);
 		this.sourceUpdated = this.sourceUpdated.bind(this);
+		this.sourceClicked = this.sourceClicked.bind(this);
 
 		const shadowRoot = this.attachShadow({mode: 'open'});
 	}
@@ -74,7 +75,11 @@ export class SourceDeviceList extends HTMLElement {
 		// be sent from the attached assistant device to allow e.g. the broadcast ID
 		// to be shown on the attached sink(s)
 
+		const source = sourceEl.getModel();
+
 		console.log('Source clicked:', sourceEl.getModel());
+
+		this.#model.addSource(source);
 	}
 
 	sourceFound(evt) {
