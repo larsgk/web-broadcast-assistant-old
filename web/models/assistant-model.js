@@ -187,7 +187,8 @@ export class AssistantModel extends EventTarget {
 			console.log('CONNECT_SINK response received');
 			break;
 			case MessageSubType.RESET:
-			console.log('RESET resonse received');
+			console.log('RESET response received');
+			this.dispatchEvent(new CustomEvent('scan-stopped'));
 			break;
 			default:
 			console.log(`Missing handler for RES subType 0x${message.subType.toString(16)}`);
