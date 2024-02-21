@@ -28,6 +28,7 @@ export const MessageSubType = Object.freeze({
 	START_SOURCE_SCAN:	0x02,
 	STOP_SCAN:		0x03,
 	CONNECT_SINK:		0x04,
+	ADD_SOURCE:		0x05,
 
 	RESET:			0x2A,
 
@@ -161,6 +162,20 @@ const bufToAddressString = (data) => {
 
 const addressStringToArray = (str) => {
 	return str.split(':').map(v => Number.parseInt(v, 16));
+}
+
+const uintToArray = (num, length) => {
+	if (length < 1 || length > 4) {
+		throw new Error("Can only handle uint8, 16, 24, 32");
+	}
+
+	let outArr = [];
+
+	for (var i = 0; i < length; i++) {
+		outArr.push((num >> (8*i)) & 0xff)
+	}
+
+	return outArr;
 }
 
 const bufToInt = (data, signed) => {
@@ -318,6 +333,15 @@ export const tvArrayToLtv = arr => {
 			case BT_DataType.BT_DATA_PUB_TARGET_ADDR:
 			case BT_DataType.BT_DATA_RAND_TARGET_ADDR:
 			outArr = addressStringToArray(value);
+			break;
+			case BT_DataType.BT_DATA_BROADCAST_ID:
+			outArr = uintToArray(value, 3);	//uint24
+			break;
+			case BT_DataType.BT_DATA_PA_INTERVAL:
+			outArr = uintToArray(value, 2); //uint16
+			break;
+			case BT_DataType.BT_DATA_SID:
+			outArr = uintToArray(value, 1);	//uint8
 			break;
 			default:
 			// Don't add fields we don't handle yet

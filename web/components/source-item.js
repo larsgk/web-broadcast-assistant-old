@@ -119,9 +119,8 @@ export class SourceItem extends HTMLElement {
 		this.#broadcastNameEl.textContent = this.#source.broadcast_name;
 		this.#addrEl.textContent = `Addr: ${addrString(this.#source.addr)}`;
 		this.#rssiEl.textContent = `RSSI: ${this.#source.rssi}`;
-
 		this.#broadcastIdEl.textContent = `Broadcast ID: 0x${
-			this.#source.broadcast_id.toString(16).toUpperCase()}`;
+			this.#source.broadcast_id?.toString(16).toUpperCase()}`;
 	}
 
 	setModel(source) {
