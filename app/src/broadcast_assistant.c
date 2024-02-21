@@ -424,6 +424,7 @@ static void scan_timeout_cb(void)
 	}
 
 	ba_state = BROADCAST_ASSISTANT_STATE_IDLE;
+	send_event(MESSAGE_SUBTYPE_STOP_SCAN, 0);
 }
 
 /*
