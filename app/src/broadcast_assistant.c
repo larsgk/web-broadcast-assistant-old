@@ -81,8 +81,14 @@ static struct bt_conn *broadcast_sink_conn;
 static void broadcast_assistant_discover_cb(struct bt_conn *conn, int err, uint8_t recv_state_count)
 {
 	LOG_INF("Broadcast assistant discover callback (%p, %d, %u)", (void *)conn, err, recv_state_count);
+	send_event(MESSAGE_SUBTYPE_CONNECT_SINK, err);
+	if (err) {
+		err = bt_conn_disconnect(conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+		if (err) {
+			LOG_ERR("Failed to disconnect (err %d)", err);
+		}
+	}
 	restart_scanning_if_needed();
-	send_event(MESSAGE_SUBTYPE_CONNECT_SINK, 0);
 }
 
 static void broadcast_assistant_add_src_cb(struct bt_conn *conn, int err)
@@ -101,18 +107,19 @@ static void connected(struct bt_conn *conn, uint8_t err)
 		LOG_ERR("Connected error (err %d)", err);
 		bt_conn_unref(broadcast_sink_conn);
 		broadcast_sink_conn = NULL;
-		restart_scanning_if_needed();
 		send_event(MESSAGE_SUBTYPE_CONNECT_SINK, err);
+		restart_scanning_if_needed();
 		return;
 	}
 
+	/* Connected. Do BAP broadcast assistant discover */
 	if (ba_state == BROADCAST_ASSISTANT_STATE_SCAN_SINK) {
 		LOG_INF("Broadcast assistant discover");
 		err = bt_bap_broadcast_assistant_discover(broadcast_sink_conn);
 		if (err) {
 			LOG_ERR("Broadcast assistant discover (err %d)", err);
-			restart_scanning_if_needed();
 			send_event(MESSAGE_SUBTYPE_CONNECT_SINK, err);
+			restart_scanning_if_needed();
 			return;
 		}
 	}
@@ -129,7 +136,7 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 	bt_conn_unref(broadcast_sink_conn);
 	broadcast_sink_conn = NULL;
 
-	send_event(MESSAGE_SUBTYPE_CONNECT_SINK, reason);
+	send_event(MESSAGE_SUBTYPE_SINK_DISCONNECT, reason);
 }
 
 static void security_changed_cb(struct bt_conn *conn, bt_security_t level, enum bt_security_err err)
@@ -569,6 +576,18 @@ int connect_to_sink(uint8_t seq_no, uint16_t msg_length, uint8_t *payload)
 		restart_scanning_if_needed();
 
 		return err;
+	}
+
+	return 0;
+}
+
+int add_source(uint8_t seq_no, uint16_t msg_length, uint8_t *payload)
+{
+	LOG_INF("Adding broadcast source...");
+
+	if (!broadcast_sink_conn) {
+		LOG_ERR("No sink connected!");
+		return -1;
 	}
 
 	return 0;
