@@ -104,6 +104,9 @@ export class AssistantModel extends EventTarget {
 				broadcast_name: tvArrayFindItem(payloadArray, [
 					BT_DataType.BT_DATA_BROADCAST_NAME
 				])?.value,
+				broadcast_id: tvArrayFindItem(payloadArray, [
+					BT_DataType.BT_DATA_BROADCAST_ID
+				])?.value,
 				pa_interval: tvArrayFindItem(payloadArray, [
 					BT_DataType.BT_DATA_PA_INTERVAL
 				])?.value,
@@ -115,7 +118,6 @@ export class AssistantModel extends EventTarget {
 			this.#sources.push(source)
 			this.dispatchEvent(new CustomEvent('source-found', {detail: { source }}));
 		} else {
-			console.log(`source rssi updated ${source.rssi} -> ${rssi}`)
 			source.rssi = rssi;
 			this.dispatchEvent(new CustomEvent('source-updated', {detail: { source }}));
 		}

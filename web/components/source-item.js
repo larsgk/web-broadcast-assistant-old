@@ -1,5 +1,7 @@
 // @ts-check
 
+import { BT_DataType } from '../lib/message.js';
+
 /*
 * Source Item Component
 */
@@ -71,6 +73,20 @@ div {
 </div>
 `;
 
+const addrString = (addr) => {
+	if (!addr) {
+		return "Unknown address";
+	}
+
+	const val = addr.value;
+
+	if (addr.type === BT_DataType.BT_DATA_RAND_TARGET_ADDR) {
+		return `${val} (random)`;
+	} else if (addr.type === BT_DataType.BT_DATA_PUB_TARGET_ADDR) {
+		return `${val} (public)`;
+	}
+}
+
 export class SourceItem extends HTMLElement {
 	#source
 	#nameEl
@@ -101,10 +117,11 @@ export class SourceItem extends HTMLElement {
 		// Set name (and more...)
 		this.#nameEl.textContent = this.#source.name;
 		this.#broadcastNameEl.textContent = this.#source.broadcast_name;
-		this.#addrEl.textContent = this.#source.addr?.value;
+		this.#addrEl.textContent = `Addr: ${addrString(this.#source.addr)}`;
 		this.#rssiEl.textContent = `RSSI: ${this.#source.rssi}`;
 
-		this.#broadcastIdEl.textContent = `Broadcast ID: 0x${this.#source.broadcastId}`;
+		this.#broadcastIdEl.textContent = `Broadcast ID: 0x${
+			this.#source.broadcast_id.toString(16).toUpperCase()}`;
 	}
 
 	setModel(source) {

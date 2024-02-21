@@ -66,6 +66,20 @@ div {
 </div>
 `;
 
+const addrString = (addr) => {
+	if (!addr) {
+		return "Unknown address";
+	}
+
+	const val = addr.value;
+
+	if (addr.type === BT_DataType.BT_DATA_RAND_TARGET_ADDR) {
+		return `${val} (random)`;
+	} else if (addr.type === BT_DataType.BT_DATA_PUB_TARGET_ADDR) {
+		return `${val} (public)`;
+	}
+}
+
 export class SinkItem extends HTMLElement {
 	#sink
 	#nameEl
@@ -76,8 +90,8 @@ export class SinkItem extends HTMLElement {
 	constructor() {
 		super();
 
-                this.setModel = this.setModel.bind(this);
-                this.refresh = this.refresh.bind(this);
+		this.setModel = this.setModel.bind(this);
+		this.refresh = this.refresh.bind(this);
 
 		const shadowRoot = this.attachShadow({mode: 'open'});
 		shadowRoot.appendChild(template.content.cloneNode(true));
@@ -90,38 +104,22 @@ export class SinkItem extends HTMLElement {
 		this.#rssiEl = this.shadowRoot?.querySelector('#rssi');
 	}
 
-        addrString(addr) {
-                if (!addr) {
-                        return "Unknown address";
-                }
-
-                const val = addr.value;
-
-                if (addr.type === BT_DataType.BT_DATA_RAND_TARGET_ADDR) {
-                        return `${val} (random)`;
-                } else if (addr.type === BT_DataType.BT_DATA_PUB_TARGET_ADDR) {
-                        return `${val} (public)`;
-                }
-        }
-
-        refresh() {
+	refresh() {
 		this.#nameEl.textContent = this.#sink.name;
-		this.#addrEl.textContent = this.addrString(this.#sink.addr);
+		this.#addrEl.textContent = `Addr: ${addrString(this.#sink.addr)}`;
 		this.#rssiEl.textContent = `RSSI: ${this.#sink.rssi}`;
 
-		this.#uuid16sEl.textContent = `UUID16s: [${this.#sink.uuid16s?.map(
-			a => {return '0x'+a.toString(16)}
-		)} ]`;
-        }
+		this.#uuid16sEl.textContent = `UUID16s: [${this.#sink.uuid16s?.map(a => {return '0x'+a.toString(16)})} ]`;
+	}
 
 	setModel(sink) {
 		this.#sink = sink;
 
-                this.refresh();
+		this.refresh();
 	}
 
-        getModel() {
-                return this.#sink;
-        }
+	getModel() {
+		return this.#sink;
+	}
 }
 customElements.define('sink-item', SinkItem);
