@@ -207,6 +207,9 @@ export class AssistantModel extends EventTarget {
 			case MessageSubType.SINK_FOUND:
 			this.handleSinkFound(message);
 			break;
+			case MessageSubType.SINK_CONNECTED:
+			this.handleSinkConnected(message);
+			break;
 			case MessageSubType.SOURCE_FOUND:
 			this.handleSourceFound(message);
 			break;
@@ -255,6 +258,11 @@ export class AssistantModel extends EventTarget {
 		};
 
 		this.#service.sendCMD(message)
+
+		// Also reset the UI
+		this.dispatchEvent(new Event('reset'));
+		this.#sinks = [];
+		this.#sources = [];
 	}
 
 	startSinkScan() {

@@ -56,8 +56,9 @@ export class SourceDeviceList extends HTMLElement {
 
 		this.#model = AssistantModel.getInstance();
 
-		this.#model.addEventListener('source-found', this.sourceFound)
-		this.#model.addEventListener('source-updated', this.sourceUpdated)
+		this.#model.addEventListener('source-found', this.sourceFound);
+		this.#model.addEventListener('source-updated', this.sourceUpdated);
+		this.#model.addEventListener('reset', () => { this.#list.replaceChildren()})
 	}
 
 	disconnectedCallback() {
