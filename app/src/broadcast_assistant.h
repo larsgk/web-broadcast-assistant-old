@@ -13,6 +13,7 @@
 
 #include <zephyr/types.h>
 #include <zephyr/bluetooth/gap.h>
+#include <zephyr/bluetooth/addr.h>
 
 #define BT_DATA_RSSI         (BT_DATA_MANUFACTURER_DATA - 1)
 #define BT_DATA_SID          (BT_DATA_MANUFACTURER_DATA - 2)
@@ -25,7 +26,7 @@ int scan_for_broadcast_sink(uint8_t seq_no);
 int stop_scanning(void);
 int connect_to_sink(uint8_t seq_no, uint16_t msg_length, uint8_t *payload);
 int disconnect_from_sink(uint8_t seq_no, uint16_t msg_length, uint8_t *payload);
-int add_source(uint8_t seq_no, uint16_t msg_length, uint8_t *payload);
+int add_source(uint8_t sid, uint16_t pa_interval, uint32_t broadcast_id, bt_addr_le_t *addr);
 int broadcast_assistant_init(void);
 int disconnect_unpair_all(void);
 
