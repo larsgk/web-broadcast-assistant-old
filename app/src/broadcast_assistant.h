@@ -23,6 +23,7 @@
 
 int scan_for_broadcast_source(uint8_t seq_no);
 int scan_for_broadcast_sink(uint8_t seq_no);
+int scan_for_broadcast_source_and_sink(uint8_t seq_no);
 int stop_scanning(void);
 int connect_to_sink(bt_addr_le_t *bt_addr_le);
 int disconnect_from_sink(bt_addr_le_t *bt_addr_le);
