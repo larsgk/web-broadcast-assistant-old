@@ -69,6 +69,16 @@ export class AssistantModel extends EventTarget {
 		this.#service.addEventListener('message', this.serviceMessageHandler);
 	}
 
+	handleHeartbeat(message) {
+		console.log(`Handle Heartbeat`);
+		const payloadArray = ltvToTvArray(message.payload);
+		console.log('Payload', payloadArray);
+
+		const heartbeat_cnt = message.seqNo;
+
+		this.dispatchEvent(new CustomEvent('heartbeat-received', {detail: heartbeat_cnt}));
+	}
+
 	handleSourceFound(message) {
 		console.log(`Handle found Source`);
 
@@ -204,6 +214,9 @@ export class AssistantModel extends EventTarget {
 		console.log(`Event with subType 0x${message.subType.toString(16)}`);
 
 		switch (message.subType) {
+			case MessageSubType.HEARTBEAT:
+			this.handleHeartbeat(message);
+			break;
 			case MessageSubType.SINK_FOUND:
 			this.handleSinkFound(message);
 			break;
@@ -257,6 +270,18 @@ export class AssistantModel extends EventTarget {
 		this.#service.sendCMD(message)
 	}
 
+	startHeartbeat() {
+		console.log("Sending Heartbeat CMD")
+
+		const message = {
+			type: Number(MessageType.CMD),
+			subType: MessageSubType.HEARTBEAT,
+			seqNo: 123,
+			payload: new Uint8Array([])
+		};
+
+		this.#service.sendCMD(message)
+	}
 	startSinkScan() {
 		console.log("Sending Start Sink Scan CMD")
 
