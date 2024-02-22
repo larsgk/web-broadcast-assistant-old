@@ -33,6 +33,7 @@ enum broadcast_assistant_state {
 
 struct scan_recv_data {
 	char bt_name[BT_NAME_LEN];
+	uint8_t bt_name_type;
 	char broadcast_name[BT_NAME_LEN];
 	uint32_t broadcast_id;
 	bool has_bass;
@@ -183,6 +184,8 @@ static bool device_found(struct bt_data *data, void *user_data)
 	case BT_DATA_NAME_SHORTENED:
 	case BT_DATA_NAME_COMPLETE:
 		memcpy(sr_data->bt_name, data->data, MIN(data->data_len, BT_NAME_LEN - 1));
+		sr_data->bt_name_type = data->type == BT_DATA_NAME_SHORTENED ?
+					BT_DATA_NAME_SHORTENED : BT_DATA_NAME_COMPLETE;
 		return true;
 	case BT_DATA_BROADCAST_NAME:
 		memcpy(sr_data->broadcast_name, data->data, MIN(data->data_len, BT_NAME_LEN - 1));
@@ -356,6 +359,10 @@ static void scan_recv_cb(const struct bt_le_scan_recv_info *info, struct net_buf
 		net_buf_add_u8(evt_msg, BT_DATA_RAND_TARGET_ADDR);
 		net_buf_add_mem(evt_msg, &info->addr->a, sizeof(bt_addr_t));
 	}
+
+	net_buf_add_u8(evt_msg, strlen(sr_data.bt_name) + 1);
+	net_buf_add_u8(evt_msg, sr_data.bt_name_type);
+	net_buf_add_mem(evt_msg, &sr_data.bt_name, strlen(sr_data.bt_name));
 
 	if (ba_state == BROADCAST_ASSISTANT_STATE_SCAN_SOURCE) {
 		/* sid */

@@ -158,7 +158,7 @@ bool ltv_found(struct bt_data *data, void *user_data)
 		_parsed->addr.type = data->type == BT_DATA_PUB_TARGET_ADDR ? BT_ADDR_LE_PUBLIC
 									   : BT_ADDR_LE_RANDOM;
 		memcpy(_parsed->addr.a.val, data->data, sizeof(bt_addr_t));
-		LOG_DBG("BT_DATA_PUB_TARGET_ADDR/BT_DATA_RAND_TARGET_ADDR");
+		LOG_DBG("%s", BT_DATA_PUB_TARGET_ADDR ? "BT_DATA_PUB_TARGET_ADDR" : "BT_DATA_RAND_TARGET_ADDR");
 
 		bt_addr_le_to_str(&_parsed->addr, addr_str, sizeof(addr_str));
 		LOG_DBG("Addr: %s", addr_str);
