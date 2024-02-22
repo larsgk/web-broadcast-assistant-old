@@ -284,14 +284,15 @@ static bool device_found(struct bt_data *data, void *user_data)
 	case BT_DATA_NAME_SHORTENED:
 	case BT_DATA_NAME_COMPLETE:
 		memcpy(sr_data->bt_name, data->data, MIN(data->data_len, BT_NAME_LEN - 1));
-		sr_data->bt_name_type = data->type == BT_DATA_NAME_SHORTENED ?
-					BT_DATA_NAME_SHORTENED : BT_DATA_NAME_COMPLETE;
+		sr_data->bt_name_type = data->type == BT_DATA_NAME_SHORTENED
+						? BT_DATA_NAME_SHORTENED
+						: BT_DATA_NAME_COMPLETE;
 		return true;
 	case BT_DATA_BROADCAST_NAME:
 		memcpy(sr_data->broadcast_name, data->data, MIN(data->data_len, BT_NAME_LEN - 1));
 		return true;
 	case BT_DATA_SVC_DATA16:
-	/* TODO: Test code bolow before enable */
+		/* TODO: Test code bolow before enable */
 #if 0
 		/* Check for BASS in Service Data */
 		if (data->data_len >= BT_UUID_SIZE_16) {
@@ -421,6 +422,10 @@ static void scan_recv_cb(const struct bt_le_scan_recv_info *info, struct net_buf
 	struct net_buf *evt_msg;
 	struct scan_recv_data sr_data = {0};
 	enum message_sub_type evt_msg_sub_type;
+	struct net_buf_simple ad_clone;
+
+	/* Clone needed for the event message because bt_data_parse consumes ad data */
+	net_buf_simple_clone(ad, &ad_clone);
 
 	switch (ba_state) {
 	case BROADCAST_ASSISTANT_STATE_SCAN_SOURCE:
@@ -442,7 +447,8 @@ static void scan_recv_cb(const struct bt_le_scan_recv_info *info, struct net_buf
 	}
 
 	evt_msg = message_alloc_tx_message();
-	net_buf_add_mem(evt_msg, ad->data, ad->len);
+
+	net_buf_add_mem(evt_msg, ad_clone.data, ad_clone.len);
 
 	/* Append data from struct bt_le_scan_recv_info (RSSI, BT addr, ..) */
 	/* RSSI */
