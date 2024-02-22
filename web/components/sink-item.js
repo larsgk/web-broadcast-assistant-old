@@ -16,7 +16,6 @@ div {
 	box-sizing: border-box;
 	min-width: 5.14em;
 	height: 75px;
-	width: 100%;
 	margin: 0.2em;
 	background: transparent;
 	text-align: center;
@@ -27,6 +26,8 @@ div {
 	padding: 0.7em 0.57em;
 	background-color: var(--background-color, white);
 	color: black;
+	box-shadow: 3px 3px 6px 3px gray;
+	transition: box-shadow 0.5s ease-out;
 }
 
 #name {
@@ -57,8 +58,23 @@ div {
 	font-size: 0.9em;
 }
 
+#card[state="connected"] {
+	background-color: lightgreen;
+	box-shadow: 1px 1px 2px 2px gray;
+}
+
+#card[state="connecting"] {
+	background-color: lightyellow;
+	box-shadow: 3px 3px 6px 3px gray;
+}
+
+#card[state="failed"] {
+	background-color: rgb(255,128,128);
+	box-shadow: 3px 3px 6px 3px gray;
+}
+
 </style>
-<div>
+<div id="card">
 <span id="name"></span>
 <span id="addr"></span>
 <span id="uuid16s"></span>
@@ -82,6 +98,7 @@ const addrString = (addr) => {
 
 export class SinkItem extends HTMLElement {
 	#sink
+	#cardEl
 	#nameEl
 	#addrEl
 	#uuid16sEl
@@ -98,6 +115,7 @@ export class SinkItem extends HTMLElement {
 	}
 
 	connectedCallback() {
+		this.#cardEl = this.shadowRoot?.querySelector('#card');
 		this.#nameEl = this.shadowRoot?.querySelector('#name');
 		this.#addrEl = this.shadowRoot?.querySelector('#addr');
 		this.#uuid16sEl = this.shadowRoot?.querySelector('#uuid16s');
@@ -110,6 +128,8 @@ export class SinkItem extends HTMLElement {
 		this.#rssiEl.textContent = `RSSI: ${this.#sink.rssi}`;
 
 		this.#uuid16sEl.textContent = `UUID16s: [${this.#sink.uuid16s?.map(a => {return '0x'+a.toString(16)})} ]`;
+
+		this.#cardEl.setAttribute('state', this.#sink.state);
 	}
 
 	setModel(sink) {

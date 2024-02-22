@@ -95,8 +95,11 @@ export class SinkDeviceList extends HTMLElement {
 
 		console.log('Sink clicked:', sink);
 
-		// For now - just call connect (until we have more state handling)
-		this.#model.connectToSink(sink);
+		if (sink.state === "connected") {
+			this.#model.disconnectSink(sink);
+		} else  {
+			this.#model.connectSink(sink);
+		}
 	}
 
 	setFilter(str) {
