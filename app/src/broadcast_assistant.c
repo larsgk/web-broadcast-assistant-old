@@ -483,9 +483,6 @@ static void scan_recv_cb(const struct bt_le_scan_recv_info *info, struct net_buf
 		net_buf_add_u8(evt_msg, 5);
 		net_buf_add_u8(evt_msg, BT_DATA_BROADCAST_ID);
 		net_buf_add_le32(evt_msg, sr_data.broadcast_id);
-
-		/* keep broadcast_id as global variable */
-		ba_source_broadcast_id = sr_data.broadcast_id;
 	}
 
 #ifdef BROADCAST_ASSISTANT_DEBUG
@@ -737,6 +734,9 @@ int add_source(uint8_t sid, uint16_t pa_interval, uint32_t broadcast_id, bt_addr
 	param.pa_interval = pa_interval;
 	param.broadcast_id = broadcast_id;
 	param.pa_sync = true;
+
+	/* keep broadcast_id as global variable */
+	ba_source_broadcast_id = broadcast_id;
 
 	LOG_INF("adv_sid = %u, pa_interval = %u, broadcast_id = 0x%08x", param.adv_sid,
 		param.pa_interval, param.broadcast_id);
