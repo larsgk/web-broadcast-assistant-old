@@ -2,10 +2,15 @@
 
 import './components/sink-device-list.js';
 import './components/source-device-list.js';
+import './components/heart-beat.js';
 
 import * as AssistantModel from './models/assistant-model.js';
 import { WebUSBDeviceService } from './services/webusb-device-service.js';
-import { logString } from './lib/message.js';
+import {
+	logString,
+	MessageType,
+	MessageSubType,
+} from './lib/message.js';
 
 const template = document.createElement('template');
 template.innerHTML = `
@@ -50,6 +55,7 @@ template.innerHTML = `
 	display: flex;
 	flex-direction: row;
 	gap: 10px;
+	align-items: center
 }
 
 button {
@@ -151,7 +157,10 @@ button:disabled {
 <div class="flex-container">
 	<div class="content">
 		<div class="col">
+			<div class="row">
 			<h2>WebUSB Broadcast Assistant</h2>
+			<heartbeat-indicator></heartbeat-indicator>
+			</div>
 
 			<div class="row">
 			<button id="sink_scan">Discover<br>Sinks</button>
@@ -220,8 +229,23 @@ export class MainApp extends HTMLElement {
 			return;
 		}
 
+		const filterLog = message => {
+			// Filter frequent messages to avoid flooding activity log
+			if ((message.type == MessageType.EVT) &&
+			    (message.subType == MessageSubType.HEARTBEAT)) {
+				return true;
+			}
+			return false;
+		}
+
 		const addToLog = evt => {
 			const { message } = evt.detail;
+
+			if (filterLog(message)) {
+				// Filter this message from the activity log
+				return;
+			}
+
 			// TBD: Change the crude prepend if performing bad on large content
 			el.textContent = logString(message) + '\n' + el.textContent;
 			console.log(logString(message));

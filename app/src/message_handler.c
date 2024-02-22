@@ -47,10 +47,10 @@ static void heartbeat_timeout_handler(struct k_timer *timer)
 		return;
 	}
 
-	net_buf_push_u8(tx_net_buf, MESSAGE_TYPE_EVT);
-	net_buf_push_u8(tx_net_buf, MESSAGE_SUBTYPE_HEARTBEAT);
-	net_buf_push_u8(tx_net_buf, heartbeat_cnt++);
 	net_buf_push_le16(tx_net_buf, 0);
+	net_buf_push_u8(tx_net_buf, heartbeat_cnt++);
+	net_buf_push_u8(tx_net_buf, MESSAGE_SUBTYPE_HEARTBEAT);
+	net_buf_push_u8(tx_net_buf, MESSAGE_TYPE_EVT);
 
 	ret = webusb_transmit(tx_net_buf);
 	if (ret != 0) {
@@ -84,7 +84,7 @@ static void send_simple_message(enum message_type mtype, enum message_sub_type s
 
 	tx_net_buf = message_alloc_tx_message();
 	if (!tx_net_buf) {
-		LOG_ERR("Failed to send allocate net_buf");
+		LOG_ERR("Failed to allocate net_buf");
 	}
 
 	/* Append error code payload */
@@ -254,6 +254,9 @@ void message_handler(struct webusb_message *msg_ptr, uint16_t msg_length)
 		send_response(MESSAGE_SUBTYPE_STOP_SCAN, msg_seq_no, msg_rc);
 		msg_rc = disconnect_unpair_all();
 		send_response(MESSAGE_SUBTYPE_RESET, msg_seq_no, msg_rc);
+		// Stop heartbeat if active
+		heartbeat_on = false;
+		k_timer_stop(&heartbeat_timer);
 		break;
 
 	default:
