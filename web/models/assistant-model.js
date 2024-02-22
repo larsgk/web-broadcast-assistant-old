@@ -167,6 +167,40 @@ export class AssistantModel extends EventTarget {
 		}
 	}
 
+	handleSinkConnectivityEvt(message) {
+		console.log(`Handle connected/disconnected Sink`);
+
+		const payloadArray = ltvToTvArray(message.payload);
+
+		const addr = tvArrayFindItem(payloadArray, [
+			BT_DataType.BT_DATA_PUB_TARGET_ADDR,
+			BT_DataType.BT_DATA_RAND_TARGET_ADDR
+		]);
+
+		if (!addr) {
+			// TBD: Throw exception?
+			return;
+		}
+
+		const err = tvArrayFindItem(payloadArray, [
+			BT_DataType.BT_DATA_ERROR_CODE
+		])?.value;
+
+		// If device already exists, just update RSSI, otherwise add to list
+		let sink = this.#sinks.find(i => i.addr.value === addr.value);
+		if (!sink) {
+			console.warn("Unknown sink connected with addr:", addr);
+		} else {
+			if (err !== 0) {
+				console.log("Error code", err);
+				sink.state = "failed";
+			} else {
+				sink.state = message.subType === MessageSubType.SINK_CONNECTED ? "connected" : undefined;
+			}
+			this.dispatchEvent(new CustomEvent('sink-updated', {detail: { sink }}));
+		}
+	}
+
 	handleRES(message) {
 		console.log(`Response message with subType 0x${message.subType.toString(16)}`);
 
@@ -208,7 +242,8 @@ export class AssistantModel extends EventTarget {
 			this.handleSinkFound(message);
 			break;
 			case MessageSubType.SINK_CONNECTED:
-			this.handleSinkConnected(message);
+			case MessageSubType.SINK_DISCONNECTED:
+			this.handleSinkConnectivityEvt(message);
 			break;
 			case MessageSubType.SOURCE_FOUND:
 			this.handleSourceFound(message);
@@ -343,7 +378,7 @@ export class AssistantModel extends EventTarget {
 		this.#service.sendCMD(message);
 	}
 
-	connectToSink(sink) {
+	connectSink(sink) {
 		console.log("Sending Connect Sink CMD");
 
 		const { addr } = sink;
@@ -359,6 +394,32 @@ export class AssistantModel extends EventTarget {
 		const message = {
 			type: Number(MessageType.CMD),
 			subType: MessageSubType.CONNECT_SINK,
+			seqNo: 123,
+			payload
+		};
+
+		this.#service.sendCMD(message);
+
+		sink.state = "connecting";
+		this.dispatchEvent(new CustomEvent('sink-updated', {detail: { sink }}));
+	}
+
+	disconnectSink(sink) {
+		console.log("Sending Disconnect Sink CMD");
+
+		const { addr } = sink;
+
+		if (!addr) {
+			throw Error("Address not found in sink object!");
+		}
+
+		const payload = tvArrayToLtv([addr]);
+
+		console.log('addr payload', payload);
+
+		const message = {
+			type: Number(MessageType.CMD),
+			subType: MessageSubType.DISCONNECT_SINK,
 			seqNo: 123,
 			payload
 		};

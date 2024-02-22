@@ -267,6 +267,7 @@ const parseLTVItem = (type, len, value) => {
 		item.value = bufToAddressString(value)
 		break;
 		case BT_DataType.BT_DATA_RSSI:
+		case BT_DataType.BT_DATA_ERROR_CODE:
 		item.value = bufToInt(value, true);
 		break;
 		case BT_DataType.BT_DATA_BROADCAST_ID:
