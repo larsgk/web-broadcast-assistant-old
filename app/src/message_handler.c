@@ -217,6 +217,12 @@ void message_handler(struct webusb_message *msg_ptr, uint16_t msg_length)
 		send_response(MESSAGE_SUBTYPE_START_SOURCE_SCAN, msg_seq_no, msg_rc);
 		break;
 
+	case MESSAGE_SUBTYPE_START_SCAN_ALL:
+		LOG_DBG("MESSAGE_SUBTYPE_START_SCAN_ALL");
+		msg_rc = scan_for_broadcast_source_and_sink(msg_seq_no);
+		send_response(MESSAGE_SUBTYPE_START_SCAN_ALL, msg_seq_no, msg_rc);
+		break;
+
 	case MESSAGE_SUBTYPE_STOP_SCAN:
 		LOG_DBG("MESSAGE_SUBTYPE_STOP_SCAN");
 		msg_rc = stop_scanning();

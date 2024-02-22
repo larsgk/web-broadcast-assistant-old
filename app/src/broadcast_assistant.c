@@ -72,7 +72,7 @@ BT_CONN_CB_DEFINE(conn_callbacks) = {
 
 static struct bt_conn *ba_sink_conn; /* TODO: Make a list of sinks */
 static enum broadcast_assistant_state ba_state;
-
+static uint32_t ba_source_broadcast_id;
 
 /*
  * Private functions
@@ -80,26 +80,83 @@ static enum broadcast_assistant_state ba_state;
 
 static void broadcast_assistant_discover_cb(struct bt_conn *conn, int err, uint8_t recv_state_count)
 {
+	const bt_addr_le_t *bt_addr_le;
+	struct net_buf *evt_msg;
+
 	LOG_INF("Broadcast assistant discover callback (%p, %d, %u)", (void *)conn, err, recv_state_count);
 	if (err) {
 		err = bt_conn_disconnect(conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
 		if (err) {
 			LOG_ERR("Failed to disconnect (err %d)", err);
-			send_event(MESSAGE_SUBTYPE_SINK_CONNECTED, -1);
 		}
+		restart_scanning_if_needed();
 
-		return;
+		return; /* return and wait for disconnected callback (assume no err) */
 	}
 
 	/* Succesful connected to sink */
-	send_event(MESSAGE_SUBTYPE_SINK_CONNECTED, 0);
+	evt_msg = message_alloc_tx_message();
+	bt_addr_le = bt_conn_get_dst(conn);
+#ifdef BROADCAST_ASSISTANT_DEBUG
+	char addr_str[BT_ADDR_LE_STR_LEN];
+
+	bt_addr_le_to_str(bt_addr_le, addr_str, sizeof(addr_str));
+	LOG_INF("Connected to %s", addr_str);
+#endif
+	/* bt_addr_le */
+	if (bt_addr_le->type == BT_ADDR_LE_PUBLIC) {
+		net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
+		net_buf_add_u8(evt_msg, BT_DATA_PUB_TARGET_ADDR);
+		net_buf_add_mem(evt_msg, &bt_addr_le->a, sizeof(bt_addr_t));
+	} else if (bt_addr_le->type == BT_ADDR_LE_RANDOM) {
+		net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
+		net_buf_add_u8(evt_msg, BT_DATA_RAND_TARGET_ADDR);
+		net_buf_add_mem(evt_msg, &bt_addr_le->a, sizeof(bt_addr_t));
+	}
+	/* error code */
+	net_buf_add_u8(evt_msg, 1 /* len of BT_DATA type */ + sizeof(int32_t));
+	net_buf_add_u8(evt_msg, BT_DATA_ERROR_CODE);
+	net_buf_add_le32(evt_msg, 0 /* OK */);
+
+	send_net_buf_event(MESSAGE_SUBTYPE_SINK_CONNECTED, evt_msg);
 	restart_scanning_if_needed();
 }
 
 static void broadcast_assistant_add_src_cb(struct bt_conn *conn, int err)
 {
+	const bt_addr_le_t *bt_addr_le;
+	struct net_buf *evt_msg;
+
 	LOG_INF("Broadcast assistant add_src callback (%p, %d)", (void *)conn, err);
-	send_event(MESSAGE_SUBTYPE_SOURCE_ADDED, err);
+
+	evt_msg = message_alloc_tx_message();
+	bt_addr_le = bt_conn_get_dst(ba_sink_conn); /* sink addr */
+#ifdef BROADCAST_ASSISTANT_DEBUG
+	char addr_str[BT_ADDR_LE_STR_LEN];
+
+	bt_addr_le_to_str(bt_addr_le, addr_str, sizeof(addr_str));
+	LOG_INF("Source added for %s", addr_str);
+#endif
+	/* bt_addr_le */
+	if (bt_addr_le->type == BT_ADDR_LE_PUBLIC) {
+		net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
+		net_buf_add_u8(evt_msg, BT_DATA_PUB_TARGET_ADDR);
+		net_buf_add_mem(evt_msg, &bt_addr_le->a, sizeof(bt_addr_t));
+	} else if (bt_addr_le->type == BT_ADDR_LE_RANDOM) {
+		net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
+		net_buf_add_u8(evt_msg, BT_DATA_RAND_TARGET_ADDR);
+		net_buf_add_mem(evt_msg, &bt_addr_le->a, sizeof(bt_addr_t));
+	}
+	/* broadcast id */
+	net_buf_add_u8(evt_msg, 5);
+	net_buf_add_u8(evt_msg, BT_DATA_BROADCAST_ID);
+	net_buf_add_le32(evt_msg, ba_source_broadcast_id);
+	/* error code */
+	net_buf_add_u8(evt_msg, 1 /* len of BT_DATA type */ + sizeof(int32_t));
+	net_buf_add_u8(evt_msg, BT_DATA_ERROR_CODE);
+	net_buf_add_le32(evt_msg, err);
+
+	send_net_buf_event(MESSAGE_SUBTYPE_SOURCE_ADDED, evt_msg);
 }
 
 static void connected(struct bt_conn *conn, uint8_t err)
@@ -110,10 +167,32 @@ static void connected(struct bt_conn *conn, uint8_t err)
 		return;
 	}
 	if (err) {
+		const bt_addr_le_t *bt_addr_le;
+		struct net_buf *evt_msg;
+
 		LOG_ERR("Connected error (err %d)", err);
+
+		evt_msg = message_alloc_tx_message();
+		bt_addr_le = bt_conn_get_dst(conn);
+		/* bt_addr_le */
+		if (bt_addr_le->type == BT_ADDR_LE_PUBLIC) {
+			net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
+			net_buf_add_u8(evt_msg, BT_DATA_PUB_TARGET_ADDR);
+			net_buf_add_mem(evt_msg, &bt_addr_le->a, sizeof(bt_addr_t));
+		} else if (bt_addr_le->type == BT_ADDR_LE_RANDOM) {
+			net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
+			net_buf_add_u8(evt_msg, BT_DATA_RAND_TARGET_ADDR);
+			net_buf_add_mem(evt_msg, &bt_addr_le->a, sizeof(bt_addr_t));
+		}
+		/* error code */
+		net_buf_add_u8(evt_msg, 1 /* len of BT_DATA type */ + sizeof(int32_t));
+		net_buf_add_u8(evt_msg, BT_DATA_ERROR_CODE);
+		net_buf_add_le32(evt_msg, err);
+
 		bt_conn_unref(ba_sink_conn);
 		ba_sink_conn = NULL;
-		send_event(MESSAGE_SUBTYPE_SINK_CONNECTED, err);
+
+		send_net_buf_event(MESSAGE_SUBTYPE_SINK_CONNECTED, evt_msg);
 		restart_scanning_if_needed();
 		return;
 	}
@@ -126,24 +205,45 @@ static void connected(struct bt_conn *conn, uint8_t err)
 		err = bt_conn_disconnect(ba_sink_conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
 		if (err) {
 			LOG_ERR("Failed to disconnect (err %d)", err);
-			send_event(MESSAGE_SUBTYPE_SINK_CONNECTED, -1);
 		}
 		restart_scanning_if_needed();
+
+		return; /* return and wait for disconnected callback (assume no err) */
 	}
 }
 
 static void disconnected(struct bt_conn *conn, uint8_t reason)
 {
+	const bt_addr_le_t *bt_addr_le;
+	struct net_buf *evt_msg;
+
 	LOG_INF("Broadcast assistant disconnected callback (%p, reason:%d)", (void *)conn, reason);
 
 	if (conn != ba_sink_conn) {
 		return;
 	}
 
+	bt_addr_le = bt_conn_get_dst(conn);
+	evt_msg = message_alloc_tx_message();
+	/* bt_addr_le */
+	if (bt_addr_le->type == BT_ADDR_LE_PUBLIC) {
+		net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
+		net_buf_add_u8(evt_msg, BT_DATA_PUB_TARGET_ADDR);
+		net_buf_add_mem(evt_msg, &bt_addr_le->a, sizeof(bt_addr_t));
+	} else if (bt_addr_le->type == BT_ADDR_LE_RANDOM) {
+		net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
+		net_buf_add_u8(evt_msg, BT_DATA_RAND_TARGET_ADDR);
+		net_buf_add_mem(evt_msg, &bt_addr_le->a, sizeof(bt_addr_t));
+	}
+	/* error code */
+	net_buf_add_u8(evt_msg, 1 /* len of BT_DATA type */ + sizeof(int32_t));
+	net_buf_add_u8(evt_msg, BT_DATA_ERROR_CODE);
+	net_buf_add_le32(evt_msg, 0 /* OK */);
+
 	bt_conn_unref(ba_sink_conn);
 	ba_sink_conn = NULL;
 
-	send_event(MESSAGE_SUBTYPE_SINK_DISCONNECTED, reason);
+	send_net_buf_event(MESSAGE_SUBTYPE_SINK_DISCONNECTED, evt_msg);
 }
 
 static void security_changed_cb(struct bt_conn *conn, bt_security_t level, enum bt_security_err err)
@@ -377,6 +477,9 @@ static void scan_recv_cb(const struct bt_le_scan_recv_info *info, struct net_buf
 		net_buf_add_u8(evt_msg, 5);
 		net_buf_add_u8(evt_msg, BT_DATA_BROADCAST_ID);
 		net_buf_add_le32(evt_msg, sr_data.broadcast_id);
+
+		/* keep broadcast_id as global variable */
+		ba_source_broadcast_id = sr_data.broadcast_id;
 	}
 
 #ifdef BROADCAST_ASSISTANT_DEBUG
@@ -469,6 +572,13 @@ int scan_for_broadcast_sink(uint8_t seq_no)
 	ba_state = BROADCAST_ASSISTANT_STATE_SCAN_SINK;
 
 	return 0;
+}
+
+int scan_for_broadcast_source_and_sink(uint8_t seq_no)
+{
+	LOG_INF("Scanning for Broadcast Sink and Source command not yet supported!");
+
+	return -1;
 }
 
 int stop_scanning(void)
@@ -568,7 +678,6 @@ int connect_to_sink(bt_addr_le_t *bt_addr_le)
 int disconnect_from_sink(bt_addr_le_t *bt_addr_le)
 {
 	char addr_str[BT_ADDR_LE_STR_LEN];
-	int err;
 
 	bt_addr_le_to_str(bt_addr_le, addr_str, sizeof(addr_str));
 	LOG_INF("Disconnecting from %s...", addr_str);
@@ -577,10 +686,30 @@ int disconnect_from_sink(bt_addr_le_t *bt_addr_le)
 	 * bt_conn_foreach(BT_CONN_TYPE_LE, disconnect, NULL).
 	 */
 	if (ba_sink_conn) {
+		int err;
+
 		err = bt_conn_disconnect(ba_sink_conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
 		if (err) {
+			struct net_buf *evt_msg;
+
 			LOG_ERR("Failed to disconnect (err %d)", err);
-			send_event(MESSAGE_SUBTYPE_SINK_DISCONNECTED, -1);
+			evt_msg = message_alloc_tx_message();
+			/* bt_addr_le */
+			if (bt_addr_le->type == BT_ADDR_LE_PUBLIC) {
+				net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
+				net_buf_add_u8(evt_msg, BT_DATA_PUB_TARGET_ADDR);
+				net_buf_add_mem(evt_msg, &bt_addr_le->a, sizeof(bt_addr_t));
+			} else if (bt_addr_le->type == BT_ADDR_LE_RANDOM) {
+				net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
+				net_buf_add_u8(evt_msg, BT_DATA_RAND_TARGET_ADDR);
+				net_buf_add_mem(evt_msg, &bt_addr_le->a, sizeof(bt_addr_t));
+			}
+			/* error code */
+			net_buf_add_u8(evt_msg, 1 /* len of BT_DATA type */ + sizeof(int32_t));
+			net_buf_add_u8(evt_msg, BT_DATA_ERROR_CODE);
+			net_buf_add_le32(evt_msg, err);
+
+			send_net_buf_event(MESSAGE_SUBTYPE_SINK_DISCONNECTED, evt_msg);
 		}
 	}
 
