@@ -37,17 +37,25 @@ div {
 	font-size: 1.2em;
 }
 
+#source {
+	position: absolute;
+	font-style: italic;
+	right: 5px;
+	top: 5px;
+	font-size: 1.2em;
+}
+
 #addr {
 	position: absolute;
 	left: 5px;
-	top: 30px;
+	bottom: 5px;
 	font-size: 0.9em;
 }
 
 #uuid16s {
 	position: absolute;
 	left: 5px;
-	bottom: 5px;
+	top: 30px;
 	font-size: 0.9em;
 }
 
@@ -76,6 +84,7 @@ div {
 </style>
 <div id="card">
 <span id="name"></span>
+<span id="source"></span>
 <span id="addr"></span>
 <span id="uuid16s"></span>
 <span id="rssi"></span>
@@ -100,6 +109,7 @@ export class SinkItem extends HTMLElement {
 	#sink
 	#cardEl
 	#nameEl
+	#sourceEl
 	#addrEl
 	#uuid16sEl
 	#rssiEl
@@ -117,6 +127,7 @@ export class SinkItem extends HTMLElement {
 	connectedCallback() {
 		this.#cardEl = this.shadowRoot?.querySelector('#card');
 		this.#nameEl = this.shadowRoot?.querySelector('#name');
+		this.#sourceEl = this.shadowRoot?.querySelector('#source');
 		this.#addrEl = this.shadowRoot?.querySelector('#addr');
 		this.#uuid16sEl = this.shadowRoot?.querySelector('#uuid16s');
 		this.#rssiEl = this.shadowRoot?.querySelector('#rssi');
@@ -127,9 +138,22 @@ export class SinkItem extends HTMLElement {
 		this.#addrEl.textContent = `Addr: ${addrString(this.#sink.addr)}`;
 		this.#rssiEl.textContent = `RSSI: ${this.#sink.rssi}`;
 
-		this.#uuid16sEl.textContent = `UUID16s: [${this.#sink.uuid16s?.map(a => {return '0x'+a.toString(16)})} ]`;
+		// Enable the UUID16 list if needed to see what different sinks provide
+		// this.#uuid16sEl.textContent = `UUID16s: [${this.#sink.uuid16s?.map(a => {return '0x'+a.toString(16)})} ]`;
 
 		this.#cardEl.setAttribute('state', this.#sink.state);
+
+		const source = this.#sink.source_added;
+
+		if (!source) {
+			if (this.#sink.state === "connected") {
+				this.#sourceEl.textContent = "Ready to receive...";
+			} else {
+				this.#sourceEl.textContent = "";
+			}
+		} else {
+			this.#sourceEl.textContent = source.broadcast_name || source.name || `0x${source.broadcast_id?.toString(16).padStart(6, '0').toUpperCase()}`;
+		}
 	}
 
 	setModel(sink) {

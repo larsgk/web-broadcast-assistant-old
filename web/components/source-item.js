@@ -16,7 +16,6 @@ div {
 	box-sizing: border-box;
 	min-width: 5.14em;
 	height: 75px;
-	width: 100%;
 	margin: 0.2em;
 	background: transparent;
 	text-align: center;
@@ -27,6 +26,8 @@ div {
 	padding: 0.7em 0.57em;
 	background-color: var(--background-color, white);
 	color: black;
+	box-shadow: 3px 3px 6px 3px gray;
+	transition: box-shadow 0.5s ease-out;
 }
 
 #name {
@@ -63,8 +64,12 @@ div {
 	font-size: 0.9em;
 }
 
+#card[state="selected"] {
+	background-color: lightgreen;
+	box-shadow: 1px 1px 2px 2px gray;
+}
 </style>
-<div>
+<div id="card">
 <span id="name"></span>
 <span id="broadcast_name"></span>
 <span id="addr"></span>
@@ -89,6 +94,7 @@ const addrString = (addr) => {
 
 export class SourceItem extends HTMLElement {
 	#source
+	#cardEl
 	#nameEl
 	#broadcastNameEl
 	#addrEl
@@ -99,13 +105,14 @@ export class SourceItem extends HTMLElement {
 		super();
 
 		this.setModel = this.setModel.bind(this);
-                this.refresh = this.refresh.bind(this);
+		this.refresh = this.refresh.bind(this);
 
 		const shadowRoot = this.attachShadow({mode: 'open'});
 		shadowRoot.appendChild(template.content.cloneNode(true));
 	}
 
 	connectedCallback() {
+		this.#cardEl = this.shadowRoot?.querySelector('#card');
 		this.#nameEl = this.shadowRoot?.querySelector('#name');
 		this.#broadcastNameEl = this.shadowRoot?.querySelector('#broadcast_name');
 		this.#addrEl = this.shadowRoot?.querySelector('#addr');
@@ -120,7 +127,9 @@ export class SourceItem extends HTMLElement {
 		this.#addrEl.textContent = `Addr: ${addrString(this.#source.addr)}`;
 		this.#rssiEl.textContent = `RSSI: ${this.#source.rssi}`;
 		this.#broadcastIdEl.textContent = `Broadcast ID: 0x${
-			this.#source.broadcast_id?.toString(16).toUpperCase()}`;
+			this.#source.broadcast_id?.toString(16).padStart(6, '0').toUpperCase()}`;
+
+		this.#cardEl.setAttribute('state', this.#source.state);
 	}
 
 	setModel(source) {

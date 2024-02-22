@@ -57,6 +57,7 @@ export class SinkDeviceList extends HTMLElement {
 
 		this.sinkFound = this.sinkFound.bind(this);
 		this.sinkUpdated = this.sinkUpdated.bind(this);
+		this.sinkDisconnected = this.sinkDisconnected.bind(this);
 		this.sinkClicked = this.sinkClicked.bind(this);
 
 		const shadowRoot = this.attachShadow({mode: 'open'});
@@ -74,6 +75,7 @@ export class SinkDeviceList extends HTMLElement {
 
 		this.#model.addEventListener('sink-found', this.sinkFound)
 		this.#model.addEventListener('sink-updated', this.sinkUpdated)
+		this.#model.addEventListener('sink-disconnected', this.sinkDisconnected)
 		this.#model.addEventListener('reset', () => { this.#list.replaceChildren()})
 	}
 
@@ -165,6 +167,16 @@ export class SinkDeviceList extends HTMLElement {
 		// this.orderByRssi();
 
 		el.addEventListener('click', this.sinkClicked);
+	}
+
+	sinkDisconnected(evt) {
+		// When the sink disconnects - it will advertise a new random address
+		// Just remove from the list
+		const { sink } = evt.detail;
+
+		const elements = Array.from(this.#list.querySelectorAll('sink-item'));
+
+		elements.find(e => e.getModel() === sink)?.remove();
 	}
 
 	sinkUpdated(evt) {
