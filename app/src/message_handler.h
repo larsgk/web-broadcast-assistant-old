@@ -13,8 +13,6 @@
 
 #include <zephyr/types.h>
 
-#define MAX_MSG_PAYLOAD_LEN 1024
-
 enum message_type {
 	MESSAGE_TYPE_CMD = 1,
 	MESSAGE_TYPE_RES,
@@ -29,10 +27,8 @@ enum message_sub_type {
 	MESSAGE_SUBTYPE_CONNECT_SINK      = 0x04,
 	MESSAGE_SUBTYPE_DISCONNECT_SINK   = 0x05,
 	MESSAGE_SUBTYPE_ADD_SOURCE        = 0x06,
-
 	MESSAGE_SUBTYPE_RESET             = 0x2A,
 
-	MESSAGE_SUBTYPE_DUMMY             = 0x7F,
 
 	/* EVT (bit7 = 1) */
 	MESSAGE_SUBTYPE_SINK_FOUND        = 0x81,
@@ -49,11 +45,13 @@ struct webusb_message {
 	uint8_t sub_type;
 	uint8_t seq_no;
 	uint16_t length;
-	uint8_t payload[MAX_MSG_PAYLOAD_LEN];
+	uint8_t payload[];
 } __packed;
 
+struct net_buf* message_alloc_tx_message(void);
 void send_response(enum message_sub_type stype, uint8_t seq_no, int32_t rc);
 void send_event(enum message_sub_type stype, int32_t rc);
+void send_net_buf_event(enum message_sub_type stype, struct net_buf *tx_net_buf);
 void message_handler(struct webusb_message *msg_ptr, uint16_t msg_length);
 void message_handler_init(void);
 
