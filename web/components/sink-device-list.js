@@ -21,13 +21,23 @@ template.innerHTML = `
 	display: flex;
 	flex-direction: column;
 }
+
 #list {
 	display: flex;
 	flex-direction: column;
 }
+
+input {
+	font-size: 1.2em;
+}
+
+.hidden {
+	display: none;
+}
 </style>
 <div id="container">
 <h2>Sink list</h2>
+<input id="filter" placeholder="Filter...">
 <div id="list">
 </div>
 </div>
@@ -36,9 +46,14 @@ template.innerHTML = `
 export class SinkDeviceList extends HTMLElement {
 	#list
 	#model
+	#filterTokens
 
 	constructor() {
 		super();
+
+		this.#filterTokens = [];
+		this.setFilter = this.setFilter.bind(this);
+		this.applyFilter = this.applyFilter.bind(this);
 
 		this.sinkFound = this.sinkFound.bind(this);
 		this.sinkUpdated = this.sinkUpdated.bind(this);
@@ -53,6 +68,7 @@ export class SinkDeviceList extends HTMLElement {
 		this.shadowRoot?.appendChild(template.content.cloneNode(true));
 		// Add listeners, etc.
 		this.#list = this.shadowRoot?.querySelector('#list');
+		this.shadowRoot?.querySelector('#filter')?.addEventListener('input', evt => { this.setFilter(evt?.target.value) } );
 
 		this.#model = AssistantModel.getInstance();
 
@@ -83,6 +99,42 @@ export class SinkDeviceList extends HTMLElement {
 		this.#model.connectToSink(sink);
 	}
 
+	setFilter(str) {
+		if (!str) {
+			this.#filterTokens = [];
+		} else {
+			const filterLower = str.toLowerCase().trim();
+			this.#filterTokens = filterLower.split(' ').filter(i => i);  // Split and remove empty strings
+		}
+
+		this.applyFilter();
+	}
+
+	applyFilter() {
+		const elements = Array.from(this.#list.querySelectorAll('sink-item'));
+
+		if (this.#filterTokens.length === 0) {
+			// Remove 'hidden' class from all items
+			elements.forEach( i => { i.classList.remove('hidden') } );
+			return;
+		}
+
+		let found = elements;
+
+		for (const t of this.#filterTokens) {
+			found = found.filter(i => i.getModel().addr?.value.toLowerCase().includes(t) ||
+				i.getModel().name?.toLowerCase().includes(t));
+		}
+
+		elements.forEach( i => {
+			if (found.includes(i)) {
+				i.classList.remove('hidden');
+			} else {
+				i.classList.add('hidden');
+			}
+		});
+	}
+
 	// TODO: This is not called for now but can be used if we want to sort by RSSI
 	orderByRssi() {
 		const elements = this.#list.querySelectorAll('sink-item');
@@ -104,6 +156,8 @@ export class SinkDeviceList extends HTMLElement {
 		const el = new SinkItem();
 		this.#list.appendChild(el);
 		el.setModel(sink);
+
+		if (this.#filterTokens.length !== 0) this.applyFilter();
 
 		// this.orderByRssi();
 
