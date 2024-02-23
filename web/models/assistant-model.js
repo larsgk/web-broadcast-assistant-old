@@ -133,8 +133,8 @@ export class AssistantModel extends EventTarget {
 		}
 	}
 
-	handleSourceAdded(message) {
-		console.log(`Handle Source added`);
+	handlePASync(message, isSynced) {
+		console.log(`Handle PA Synced`);
 
 		const payloadArray = ltvToTvArray(message.payload);
 
@@ -159,7 +159,7 @@ export class AssistantModel extends EventTarget {
 		// If device already exists, just update RSSI, otherwise add to list
 		let sink = this.#sinks.find(i => i.addr.value === sink_addr.value);
 		if (!sink) {
-			console.warn("Source added to unknown sink addr:", sink_addr);
+			console.warn("PA Sync w/ unknown sink addr:", sink_addr);
 			return;
 		}
 
@@ -169,15 +169,16 @@ export class AssistantModel extends EventTarget {
 			return;
 		}
 
+		let syncState = isSynced ? "selected" : undefined;
+
 		this.#sources.forEach( s => {
-			s.state = source === s ? "selected" : undefined;
+			s.state = source === s ? syncState : undefined;
 			this.dispatchEvent(new CustomEvent('source-updated', {detail: { source: s }}));
 		});
 
 		sink.source_added = source;
 		this.dispatchEvent(new CustomEvent('sink-updated', {detail: { sink }}));
 	}
-
 
 	handleSinkFound(message) {
 		console.log(`Handle found Sink`);
@@ -313,7 +314,7 @@ export class AssistantModel extends EventTarget {
 			this.handleSourceFound(message);
 			break;
 			case MessageSubType.SOURCE_ADDED:
-			this.handleSourceAdded(message);
+			console.log("Source Added");
 			break;
 			case MessageSubType.STOP_SCAN:
 			console.log('STOP_SCAN response received');
@@ -328,24 +329,15 @@ export class AssistantModel extends EventTarget {
 			this.dispatchEvent(new CustomEvent('source-removed'));
 			break;
 			case MessageSubType.NEW_PA_STATE_NOT_SYNCED:
-			console.log('NEW_PA_STATE_NOT_SYNCED response received');
-			this.dispatchEvent(new CustomEvent('pa-not-synced'));
+			this.handlePASync(message, false);
 			break;
 			case MessageSubType.NEW_PA_STATE_INFO_REQ:
-			console.log('NEW_PA_STATE_INFO_REQ response received');
-			this.dispatchEvent(new CustomEvent('pa-info-req'));
 			break;
 			case MessageSubType.NEW_PA_STATE_SYNCED:
-			console.log('NEW_PA_STATE_SYNCED response received');
-			this.dispatchEvent(new CustomEvent('pa-synced'));
+			this.handlePASync(message, true);
 			break;
 			case MessageSubType.NEW_PA_STATE_FAILED:
-			console.log('NEW_PA_STATE_FAILED response received');
-			this.dispatchEvent(new CustomEvent('pa-failed'));
-			break;
 			case MessageSubType.NEW_PA_STATE_NO_PAST:
-			console.log('NEW_PA_STATE_NO_PAST response received');
-			this.dispatchEvent(new CustomEvent('pa-no-past'));
 			break;
 			default:
 			console.log(`Missing handler for EVT subType 0x${message.subType.toString(16)}`);

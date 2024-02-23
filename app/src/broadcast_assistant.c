@@ -123,35 +123,59 @@ static void broadcast_assistant_recv_state_cb(struct bt_conn *conn, int err,
 {
 	LOG_INF("Broadcast assistant recv_state callback (%p, %d)", (void *)conn, err);
 
-	// TODO: We have to couple these to the actual sink in question, i.e. add a payload to events
 	if (state->pa_sync_state != recv_state.pa_sync_state) {
+		struct net_buf *evt_msg;
+		enum message_sub_type evt_msg_sub_type;
+		const bt_addr_le_t *addr;
+
 		LOG_INF("Going from PA state %u to %u", recv_state.pa_sync_state, state->pa_sync_state);
 
 		switch (state->pa_sync_state) {
 		case BT_BAP_PA_STATE_NOT_SYNCED:
 			LOG_INF("BT_BAP_PA_STATE_NOT_SYNCED");
-			send_event(MESSAGE_SUBTYPE_NEW_PA_STATE_NOT_SYNCED, err);
+			evt_msg_sub_type = MESSAGE_SUBTYPE_NEW_PA_STATE_NOT_SYNCED;
 			break;
 		case BT_BAP_PA_STATE_INFO_REQ:
 			LOG_INF("BT_BAP_PA_STATE_INFO_REQ");
-			send_event(MESSAGE_SUBTYPE_NEW_PA_STATE_INFO_REQ, err);
+			evt_msg_sub_type = MESSAGE_SUBTYPE_NEW_PA_STATE_INFO_REQ;
 			break;
 		case BT_BAP_PA_STATE_SYNCED:
 			LOG_INF("BT_BAP_PA_STATE_SYNCED");
-			send_event(MESSAGE_SUBTYPE_NEW_PA_STATE_SYNCED, err);
+			evt_msg_sub_type = MESSAGE_SUBTYPE_NEW_PA_STATE_SYNCED;
 			break;
 		case BT_BAP_PA_STATE_FAILED:
 			LOG_INF("BT_BAP_PA_STATE_FAILED");
-			send_event(MESSAGE_SUBTYPE_NEW_PA_STATE_FAILED, err);
+			evt_msg_sub_type = MESSAGE_SUBTYPE_NEW_PA_STATE_FAILED;
 			break;
 		case BT_BAP_PA_STATE_NO_PAST:
 			LOG_INF("BT_BAP_PA_STATE_NO_PAST");
-			send_event(MESSAGE_SUBTYPE_NEW_PA_STATE_NO_PAST, err);
+			evt_msg_sub_type = MESSAGE_SUBTYPE_NEW_PA_STATE_NO_PAST;
 			break;
 		default:
 			LOG_INF("Invalid State Transition");
 			return;
 		}
+
+		evt_msg = message_alloc_tx_message();
+
+		/* LE addr */
+		addr = bt_conn_get_dst(conn);
+		if (addr->type == BT_ADDR_LE_PUBLIC) {
+			net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
+			net_buf_add_u8(evt_msg, BT_DATA_PUB_TARGET_ADDR);
+			net_buf_add_mem(evt_msg, &addr->a, sizeof(bt_addr_t));
+		} else if (addr->type == BT_ADDR_LE_RANDOM) {
+			net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
+			net_buf_add_u8(evt_msg, BT_DATA_RAND_TARGET_ADDR);
+			net_buf_add_mem(evt_msg, &addr->a, sizeof(bt_addr_t));
+		}
+
+		/* broadcast id */
+		net_buf_add_u8(evt_msg, 5);
+		net_buf_add_u8(evt_msg, BT_DATA_BROADCAST_ID);
+		net_buf_add_le32(evt_msg, state->broadcast_id);
+
+		send_net_buf_event(evt_msg_sub_type, evt_msg);
 	}
 
 	memcpy(&recv_state, state, sizeof(struct bt_bap_scan_delegator_recv_state));
