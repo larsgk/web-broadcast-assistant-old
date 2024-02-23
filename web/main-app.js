@@ -201,9 +201,18 @@ export class MainApp extends HTMLElement {
 	#scanSourceButton
 	#stopScanButton
 	#model
+	#pageState
 
 	constructor() {
 		super();
+
+		this.#pageState = new Map();
+
+		for (let [name, value] of new URLSearchParams(location.search).entries()) {
+			this.#pageState.set(name, value);
+
+			console.log("STATE", name, value);
+		}
 
 		this.initializeModels();
 
@@ -290,7 +299,18 @@ export class MainApp extends HTMLElement {
 		this.#model.addEventListener('sink-scan-started', this.sinkScanStarted);
 		this.#model.addEventListener('source-scan-started', this.sourceScanStarted);
 
-		this.initializeLogging(this.shadowRoot?.querySelector('#activity'));
+		const activityLog = this.shadowRoot?.querySelector('#activity');
+		if (this.#pageState.get('log') === 'y') {
+			this.initializeLogging(activityLog);
+		} else {
+			activityLog?.remove();
+		}
+
+		const heartbeat = this.shadowRoot?.querySelector('heartbeat-indicator');
+		if (this.#pageState.get('heartbeat') !== 'y') {
+			heartbeat?.remove();
+		}
+
 
 		WebUSBDeviceService.reconnectPairedDevices();
 	}
