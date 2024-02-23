@@ -20,16 +20,8 @@
 
 LOG_MODULE_REGISTER(broadcast_assistant, LOG_LEVEL_INF);
 
-/*#define BROADCAST_ASSISTANT_DEBUG*/
-
 #define BT_NAME_LEN 30
 #define INVALID_BROADCAST_ID 0xFFFFFFFFU
-
-enum broadcast_assistant_state {
-	BROADCAST_ASSISTANT_STATE_IDLE,
-	BROADCAST_ASSISTANT_STATE_SCAN_SOURCE,
-	BROADCAST_ASSISTANT_STATE_SCAN_SINK,
-};
 
 struct scan_recv_data {
 	char bt_name[BT_NAME_LEN];
@@ -76,7 +68,7 @@ BT_CONN_CB_DEFINE(conn_callbacks) = {
 };
 
 static struct bt_conn *ba_sink_conn; /* TODO: Make a list of sinks */
-static enum broadcast_assistant_state ba_state;
+static uint8_t ba_scan_target;
 static uint32_t ba_source_broadcast_id;
 static struct bt_bap_scan_delegator_recv_state recv_state = {0};
 
@@ -87,6 +79,7 @@ static struct bt_bap_scan_delegator_recv_state recv_state = {0};
 static void broadcast_assistant_discover_cb(struct bt_conn *conn, int err, uint8_t recv_state_count)
 {
 	const bt_addr_le_t *bt_addr_le;
+	char addr_str[BT_ADDR_LE_STR_LEN];
 	struct net_buf *evt_msg;
 
 	LOG_INF("Broadcast assistant discover callback (%p, %d, %u)", (void *)conn, err, recv_state_count);
@@ -103,12 +96,9 @@ static void broadcast_assistant_discover_cb(struct bt_conn *conn, int err, uint8
 	/* Succesful connected to sink */
 	evt_msg = message_alloc_tx_message();
 	bt_addr_le = bt_conn_get_dst(conn);
-#ifdef BROADCAST_ASSISTANT_DEBUG
-	char addr_str[BT_ADDR_LE_STR_LEN];
-
 	bt_addr_le_to_str(bt_addr_le, addr_str, sizeof(addr_str));
-	LOG_INF("Connected to %s", addr_str);
-#endif
+	LOG_DBG("Connected to %s", addr_str);
+
 	/* bt_addr_le */
 	if (bt_addr_le->type == BT_ADDR_LE_PUBLIC) {
 		net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
@@ -176,18 +166,16 @@ static void broadcast_assistant_recv_state_removed_cb(struct bt_conn *conn, int 
 static void broadcast_assistant_add_src_cb(struct bt_conn *conn, int err)
 {
 	const bt_addr_le_t *bt_addr_le;
+	char addr_str[BT_ADDR_LE_STR_LEN];
 	struct net_buf *evt_msg;
 
 	LOG_INF("Broadcast assistant add_src callback (%p, %d)", (void *)conn, err);
 
 	evt_msg = message_alloc_tx_message();
 	bt_addr_le = bt_conn_get_dst(ba_sink_conn); /* sink addr */
-#ifdef BROADCAST_ASSISTANT_DEBUG
-	char addr_str[BT_ADDR_LE_STR_LEN];
-
 	bt_addr_le_to_str(bt_addr_le, addr_str, sizeof(addr_str));
-	LOG_INF("Source added for %s", addr_str);
-#endif
+	LOG_DBG("Source added for %s", addr_str);
+
 	/* bt_addr_le */
 	if (bt_addr_le->type == BT_ADDR_LE_PUBLIC) {
 		net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
@@ -306,23 +294,21 @@ static void restart_scanning_if_needed(void)
 {
 	int err;
 
-	switch (ba_state) {
-	case BROADCAST_ASSISTANT_STATE_SCAN_SOURCE:
-	case BROADCAST_ASSISTANT_STATE_SCAN_SINK:
+	if (ba_scan_target) {
 		LOG_INF("Restart scanning");
 		err = bt_le_scan_start(BT_LE_SCAN_PASSIVE, NULL);
 		if (err) {
 			LOG_ERR("Scanning failed to start (err %d)", err);
-			send_event(ba_state == BROADCAST_ASSISTANT_STATE_SCAN_SOURCE
-					   ? MESSAGE_SUBTYPE_START_SOURCE_SCAN
-					   : MESSAGE_SUBTYPE_START_SINK_SCAN,
-				   err);
+			if (ba_scan_target == BROADCAST_ASSISTANT_SCAN_TARGET_ALL) {
+				send_event(MESSAGE_SUBTYPE_START_SCAN_ALL, err);
+			} else if (ba_scan_target == BROADCAST_ASSISTANT_SCAN_TARGET_SOURCE) {
+				send_event(MESSAGE_SUBTYPE_START_SOURCE_SCAN, err);
+			} else if (ba_scan_target == BROADCAST_ASSISTANT_SCAN_TARGET_SINK) {
+				send_event(MESSAGE_SUBTYPE_START_SINK_SCAN, err);
+			}
 
-			ba_state = BROADCAST_ASSISTANT_STATE_IDLE;
+			ba_scan_target = 0;
 		}
-		break;
-	default:
-		break;
 	}
 }
 
@@ -470,123 +456,104 @@ static bool scan_for_sink(const struct bt_le_scan_recv_info *info, struct net_bu
 
 static void scan_recv_cb(const struct bt_le_scan_recv_info *info, struct net_buf_simple *ad)
 {
-	struct net_buf *evt_msg;
-	struct scan_recv_data sr_data = {0};
-	enum message_sub_type evt_msg_sub_type;
-	struct net_buf_simple ad_clone;
+	struct net_buf_simple ad_clone1, ad_clone2;
 
 	/* Clone needed for the event message because bt_data_parse consumes ad data */
-	net_buf_simple_clone(ad, &ad_clone);
+	net_buf_simple_clone(ad, &ad_clone1);
+	net_buf_simple_clone(ad, &ad_clone2);
 
-	switch (ba_state) {
-	case BROADCAST_ASSISTANT_STATE_SCAN_SOURCE:
-		if (scan_for_source(info, ad, &sr_data)) {
+	if (ba_scan_target & BROADCAST_ASSISTANT_SCAN_TARGET_SOURCE) {
+		enum message_sub_type evt_msg_sub_type;
+		struct net_buf *evt_msg;
+		struct scan_recv_data sr_data = {0};
+
+		if (scan_for_source(info, &ad_clone1, &sr_data)) {
 			/* broadcast source found */
 			evt_msg_sub_type = MESSAGE_SUBTYPE_SOURCE_FOUND;
-			break; /* send message */
+			evt_msg = message_alloc_tx_message();
+
+			net_buf_add_mem(evt_msg, ad->data, ad->len);
+
+			/* Append data from struct bt_le_scan_recv_info (RSSI, BT addr, ..) */
+			/* RSSI */
+			net_buf_add_u8(evt_msg, 2);
+			net_buf_add_u8(evt_msg, BT_DATA_RSSI);
+			net_buf_add_u8(evt_msg, info->rssi);
+			/* bt_addr_le */
+			if (info->addr->type == BT_ADDR_LE_PUBLIC) {
+				net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
+				net_buf_add_u8(evt_msg, BT_DATA_PUB_TARGET_ADDR);
+				net_buf_add_mem(evt_msg, &info->addr->a, sizeof(bt_addr_t));
+			} else if (info->addr->type == BT_ADDR_LE_RANDOM) {
+				net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
+				net_buf_add_u8(evt_msg, BT_DATA_RAND_TARGET_ADDR);
+				net_buf_add_mem(evt_msg, &info->addr->a, sizeof(bt_addr_t));
+			}
+
+			net_buf_add_u8(evt_msg, strlen(sr_data.bt_name) + 1);
+			net_buf_add_u8(evt_msg, sr_data.bt_name_type);
+			net_buf_add_mem(evt_msg, &sr_data.bt_name, strlen(sr_data.bt_name));
+
+			/* sid */
+			net_buf_add_u8(evt_msg, 2);
+			net_buf_add_u8(evt_msg, BT_DATA_SID);
+			net_buf_add_u8(evt_msg, info->sid);
+			/* pa interval */
+			net_buf_add_u8(evt_msg, 3);
+			net_buf_add_u8(evt_msg, BT_DATA_PA_INTERVAL);
+			net_buf_add_le16(evt_msg, info->interval);
+			/* broadcast id */
+			net_buf_add_u8(evt_msg, 5);
+			net_buf_add_u8(evt_msg, BT_DATA_BROADCAST_ID);
+			net_buf_add_le32(evt_msg, sr_data.broadcast_id);
+
+			send_net_buf_event(evt_msg_sub_type, evt_msg);
 		}
-		return;
-	case BROADCAST_ASSISTANT_STATE_SCAN_SINK:
-		if (scan_for_sink(info, ad, &sr_data)) {
+	}
+
+	if (ba_scan_target & BROADCAST_ASSISTANT_SCAN_TARGET_SINK) {
+		enum message_sub_type evt_msg_sub_type;
+		struct net_buf *evt_msg;
+		struct scan_recv_data sr_data = {0};
+
+		if (scan_for_sink(info, &ad_clone2, &sr_data)) {
 			/* broadcast sink found */
 			evt_msg_sub_type = MESSAGE_SUBTYPE_SINK_FOUND;
-			break; /* send message */
-		}
-		return;
-	default:
-		return;
-	}
+			evt_msg = message_alloc_tx_message();
 
-	evt_msg = message_alloc_tx_message();
+			net_buf_add_mem(evt_msg, ad->data, ad->len);
 
-	net_buf_add_mem(evt_msg, ad_clone.data, ad_clone.len);
-
-	/* Append data from struct bt_le_scan_recv_info (RSSI, BT addr, ..) */
-	/* RSSI */
-	net_buf_add_u8(evt_msg, 2);
-	net_buf_add_u8(evt_msg, BT_DATA_RSSI);
-	net_buf_add_u8(evt_msg, info->rssi);
-	/* bt_addr_le */
-	if (info->addr->type == BT_ADDR_LE_PUBLIC) {
-		net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
-		net_buf_add_u8(evt_msg, BT_DATA_PUB_TARGET_ADDR);
-		net_buf_add_mem(evt_msg, &info->addr->a, sizeof(bt_addr_t));
-	} else if (info->addr->type == BT_ADDR_LE_RANDOM) {
-		net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
-		net_buf_add_u8(evt_msg, BT_DATA_RAND_TARGET_ADDR);
-		net_buf_add_mem(evt_msg, &info->addr->a, sizeof(bt_addr_t));
-	}
-
-	net_buf_add_u8(evt_msg, strlen(sr_data.bt_name) + 1);
-	net_buf_add_u8(evt_msg, sr_data.bt_name_type);
-	net_buf_add_mem(evt_msg, &sr_data.bt_name, strlen(sr_data.bt_name));
-
-	if (ba_state == BROADCAST_ASSISTANT_STATE_SCAN_SOURCE) {
-		/* sid */
-		net_buf_add_u8(evt_msg, 2);
-		net_buf_add_u8(evt_msg, BT_DATA_SID);
-		net_buf_add_u8(evt_msg, info->sid);
-		/* pa interval */
-		net_buf_add_u8(evt_msg, 3);
-		net_buf_add_u8(evt_msg, BT_DATA_PA_INTERVAL);
-		net_buf_add_le16(evt_msg, info->interval);
-		/* broadcast id */
-		net_buf_add_u8(evt_msg, 5);
-		net_buf_add_u8(evt_msg, BT_DATA_BROADCAST_ID);
-		net_buf_add_le32(evt_msg, sr_data.broadcast_id);
-	}
-
-#ifdef BROADCAST_ASSISTANT_DEBUG
-	char log_str[256] = {0};
-	uint8_t *payload_ptr = &evt_msg->data[0];
-
-	/* Show message payload */
-	for (int i = 0; i < evt_msg->len;) {
-		uint8_t len = *payload_ptr++;
-		char *ch_ptr = &log_str[0];
-
-		/* length */
-		sprintf(ch_ptr, "[ L:%02x ", len);
-		ch_ptr += 7;
-		if (len > 0) {
-			/* type */
-			sprintf(ch_ptr, "T:%02x ", *payload_ptr++);
-			ch_ptr += 5;
-			if (len > 1) {
-				/* value */
-				for (int j = 1; j < len; j++) {
-					sprintf(ch_ptr, "%02x ", *payload_ptr++);
-					ch_ptr += 3;
-				}
+			/* Append data from struct bt_le_scan_recv_info (RSSI, BT addr, ..) */
+			/* RSSI */
+			net_buf_add_u8(evt_msg, 2);
+			net_buf_add_u8(evt_msg, BT_DATA_RSSI);
+			net_buf_add_u8(evt_msg, info->rssi);
+			/* bt_addr_le */
+			if (info->addr->type == BT_ADDR_LE_PUBLIC) {
+				net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
+				net_buf_add_u8(evt_msg, BT_DATA_PUB_TARGET_ADDR);
+				net_buf_add_mem(evt_msg, &info->addr->a, sizeof(bt_addr_t));
+			} else if (info->addr->type == BT_ADDR_LE_RANDOM) {
+				net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
+				net_buf_add_u8(evt_msg, BT_DATA_RAND_TARGET_ADDR);
+				net_buf_add_mem(evt_msg, &info->addr->a, sizeof(bt_addr_t));
 			}
+
+			net_buf_add_u8(evt_msg, strlen(sr_data.bt_name) + 1);
+			net_buf_add_u8(evt_msg, sr_data.bt_name_type);
+			net_buf_add_mem(evt_msg, &sr_data.bt_name, strlen(sr_data.bt_name));
+
+			send_net_buf_event(evt_msg_sub_type, evt_msg);
 		}
-		sprintf(ch_ptr, "]");
-		ch_ptr += 1;
-		i += (len + 1);
-
-		LOG_DBG("%s", log_str);
 	}
-#endif /* BROADCAST_ASSISTANT_DEBUG */
-
-	send_net_buf_event(evt_msg_sub_type, evt_msg);
 }
 
 static void scan_timeout_cb(void)
 {
 	LOG_INF("Scan timeout");
 
-	switch (ba_state) {
-	case BROADCAST_ASSISTANT_STATE_SCAN_SOURCE:
-		send_event(MESSAGE_SUBTYPE_START_SOURCE_SCAN, -1);
-		break;
-	case BROADCAST_ASSISTANT_STATE_SCAN_SINK:
-		send_event(MESSAGE_SUBTYPE_START_SINK_SCAN, -1);
-		break;
-	default:
-		break;
-	}
+	ba_scan_target = 0;
 
-	ba_state = BROADCAST_ASSISTANT_STATE_IDLE;
 	send_event(MESSAGE_SUBTYPE_STOP_SCAN, 0);
 }
 
@@ -594,9 +561,9 @@ static void scan_timeout_cb(void)
  * Public functions
  */
 
-int scan_for_broadcast_source(uint8_t seq_no)
+int start_scan(uint8_t target)
 {
-	if (ba_state == BROADCAST_ASSISTANT_STATE_IDLE) {
+	if (ba_scan_target == 0) {
 		int err = bt_le_scan_start(BT_LE_SCAN_PASSIVE, NULL);
 		if (err) {
 			LOG_ERR("Scanning failed to start (err %d)", err);
@@ -604,43 +571,21 @@ int scan_for_broadcast_source(uint8_t seq_no)
 		}
 	}
 
-	LOG_INF("Scanning for Broadcast Source started");
+	ba_scan_target = target;
 
-	ba_state = BROADCAST_ASSISTANT_STATE_SCAN_SOURCE;
-
-	return 0;
-}
-
-int scan_for_broadcast_sink(uint8_t seq_no)
-{
-	if (ba_state == BROADCAST_ASSISTANT_STATE_IDLE) {
-		int err = bt_le_scan_start(BT_LE_SCAN_PASSIVE, NULL);
-		if (err) {
-			LOG_ERR("Scanning failed to start (err %d)", err);
-			return err;
-		}
-	}
-
-	LOG_INF("Scanning for Broadcast Sink started");
-
-	ba_state = BROADCAST_ASSISTANT_STATE_SCAN_SINK;
+	LOG_INF("Scanning started (target: 0x%08x)", ba_scan_target);
 
 	return 0;
-}
-
-int scan_for_broadcast_source_and_sink(uint8_t seq_no)
-{
-	LOG_INF("Scanning for Broadcast Sink and Source command not yet supported!");
-
-	return -1;
 }
 
 int stop_scanning(void)
 {
-	if (ba_state == BROADCAST_ASSISTANT_STATE_IDLE) {
+	if (ba_scan_target == 0) {
 		/* No scan ongoing */
 		return 0;
 	}
+
+	ba_scan_target = 0;
 
 	int err = bt_le_scan_stop();
 	if (err) {
@@ -649,8 +594,6 @@ int stop_scanning(void)
 	}
 
 	LOG_INF("Scanning stopped");
-
-	ba_state = BROADCAST_ASSISTANT_STATE_IDLE;
 
 	return 0;
 }
@@ -700,18 +643,13 @@ int connect_to_sink(bt_addr_le_t *bt_addr_le)
 	}
 
 	/* Stop scanning if needed */
-	switch (ba_state) {
-	case BROADCAST_ASSISTANT_STATE_SCAN_SOURCE:
-	case BROADCAST_ASSISTANT_STATE_SCAN_SINK:
+	if (ba_scan_target) {
 		LOG_INF("Stop scanning");
 		err = bt_le_scan_stop();
 		if (err) {
 			LOG_ERR("bt_le_scan_stop failed %d", err);
 			return err;
 		}
-		break;
-	default:
-		break;
 	}
 
 	bt_addr_le_to_str(bt_addr_le, addr_str, sizeof(addr_str));
@@ -825,7 +763,7 @@ int broadcast_assistant_init(void)
 	bt_bap_broadcast_assistant_register_cb(&broadcast_assistant_callbacks);
 	LOG_INF("Bluetooth scan callback registered");
 
-	ba_state = BROADCAST_ASSISTANT_STATE_IDLE;
+	ba_scan_target = 0;
 
 	return 0;
 }

@@ -31,6 +31,7 @@ export const MessageSubType = Object.freeze({
 	CONNECT_SINK:			0x05,
 	DISCONNECT_SINK:		0x06,
 	ADD_SOURCE:			0x07,
+	REMOVE_SOURCE:			0x08,
 
 	RESET:				0x2A,
 

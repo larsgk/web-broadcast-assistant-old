@@ -19,7 +19,7 @@
 #include "broadcast_assistant.h"
 #include "message_handler.h"
 
-LOG_MODULE_REGISTER(message_handler, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(message_handler, LOG_LEVEL_INF);
 
 NET_BUF_POOL_DEFINE(command_tx_msg_pool, CONFIG_TX_MSG_MAX_MESSAGES, sizeof(struct webusb_message) + CONFIG_TX_MSG_MAX_PAYLOAD_LEN, 0, NULL);
 
@@ -34,6 +34,41 @@ struct webusb_ltv_data {
 static void heartbeat_timeout_handler(struct k_timer *dummy_p);
 K_TIMER_DEFINE(heartbeat_timer, heartbeat_timeout_handler, NULL);
 
+static void log_ltv(uint8_t *data, uint16_t data_len);
+
+#define LTV_STR_LEN 256
+
+static void log_ltv(uint8_t *data, uint16_t data_len)
+{
+	char ltv_str[LTV_STR_LEN] = {0};
+
+	/* Log message payload (ltv format) */
+	for (int i = 0; i < data_len;) {
+		uint8_t ltv_len = *data++;
+		char *ch_ptr = &ltv_str[0];
+
+		/* length */
+		sprintf(ch_ptr, "[ L:%02x ", ltv_len);
+		ch_ptr += 7;
+		if (ltv_len > 0) {
+			/* type */
+			sprintf(ch_ptr, "T:%02x ", *data++);
+			ch_ptr += 5;
+			if (ltv_len > 1) {
+				/* value */
+				for (int j = 1; j < ltv_len; j++) {
+					sprintf(ch_ptr, "%02x ", *data++);
+					ch_ptr += 3;
+				}
+			}
+		}
+		sprintf(ch_ptr, "]");
+		ch_ptr += 1;
+		i += (ltv_len + 1);
+
+		LOG_DBG("%s", ltv_str);
+	}
+}
 
 static struct webusb_ltv_data parsed_ltv_data;
 static void heartbeat_timeout_handler(struct k_timer *timer)
@@ -99,6 +134,8 @@ static void send_simple_message(enum message_type mtype, enum message_sub_type s
 	net_buf_push_u8(tx_net_buf, stype);
 	net_buf_push_u8(tx_net_buf, mtype);
 
+	log_ltv(&tx_net_buf->data[0], tx_net_buf->len);
+
 	ret = webusb_transmit(tx_net_buf);
 	if (ret != 0) {
 		LOG_ERR("Failed to send message (err=%d)", ret);
@@ -125,6 +162,9 @@ void send_net_buf_event(enum message_sub_type stype, struct net_buf *tx_net_buf)
 	net_buf_push_u8(tx_net_buf, 0);
 	net_buf_push_u8(tx_net_buf, stype);
 	net_buf_push_u8(tx_net_buf, MESSAGE_TYPE_EVT);
+
+	LOG_INF("send_net_buf_event(stype: %d)", stype);
+	log_ltv(&tx_net_buf->data[0], tx_net_buf->len);
 
 	ret = webusb_transmit(tx_net_buf);
 	if (ret != 0) {
@@ -207,19 +247,19 @@ void message_handler(struct webusb_message *msg_ptr, uint16_t msg_length)
 
 	case MESSAGE_SUBTYPE_START_SINK_SCAN:
 		LOG_DBG("MESSAGE_SUBTYPE_START_SINK_SCAN");
-		msg_rc = scan_for_broadcast_sink(msg_seq_no);
+		msg_rc = start_scan(BROADCAST_ASSISTANT_SCAN_TARGET_SINK);
 		send_response(MESSAGE_SUBTYPE_START_SINK_SCAN, msg_seq_no, msg_rc);
 		break;
 
 	case MESSAGE_SUBTYPE_START_SOURCE_SCAN:
 		LOG_DBG("MESSAGE_SUBTYPE_START_SOURCE_SCAN");
-		msg_rc = scan_for_broadcast_source(msg_seq_no);
+		msg_rc = start_scan(BROADCAST_ASSISTANT_SCAN_TARGET_SOURCE);
 		send_response(MESSAGE_SUBTYPE_START_SOURCE_SCAN, msg_seq_no, msg_rc);
 		break;
 
 	case MESSAGE_SUBTYPE_START_SCAN_ALL:
 		LOG_DBG("MESSAGE_SUBTYPE_START_SCAN_ALL");
-		msg_rc = scan_for_broadcast_source_and_sink(msg_seq_no);
+		msg_rc = start_scan(BROADCAST_ASSISTANT_SCAN_TARGET_ALL);
 		send_response(MESSAGE_SUBTYPE_START_SCAN_ALL, msg_seq_no, msg_rc);
 		break;
 
@@ -246,6 +286,11 @@ void message_handler(struct webusb_message *msg_ptr, uint16_t msg_length)
 		msg_rc = add_source(parsed_ltv_data.adv_sid, parsed_ltv_data.pa_interval,
 				    parsed_ltv_data.broadcast_id, &parsed_ltv_data.addr);
 		send_response(MESSAGE_SUBTYPE_ADD_SOURCE, msg_seq_no, msg_rc);
+		break;
+
+	case MESSAGE_SUBTYPE_REMOVE_SOURCE:
+		LOG_DBG("MESSAGE_SUBTYPE_REMOVE_SOURCE (len %u)", msg_length);
+		send_response(MESSAGE_SUBTYPE_ADD_SOURCE, msg_seq_no, -1); /* Not implemeted */
 		break;
 
 	case MESSAGE_SUBTYPE_RESET:
