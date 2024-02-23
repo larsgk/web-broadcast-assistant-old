@@ -238,12 +238,25 @@ export class MainApp extends HTMLElement {
 			return;
 		}
 
+		let lastLogMsg;
+
 		const filterLog = message => {
 			// Filter frequent messages to avoid flooding activity log
-			if ((message.type == MessageType.EVT) &&
-			    (message.subType == MessageSubType.HEARTBEAT)) {
+			if ((message.type === MessageType.EVT) &&
+			    (message.subType === MessageSubType.HEARTBEAT)) {
 				return true;
 			}
+
+			if (lastLogMsg) {
+				if (message.type === MessageType.EVT && lastLogMsg.type === MessageType.EVT) {
+					if (message.subType === lastLogMsg.subType &&
+					    [MessageSubType.SINK_FOUND, MessageSubType.SOURCE_FOUND].includes(message.subType)) {
+						return true;
+					    }
+				}
+			}
+
+			lastLogMsg = message;
 			return false;
 		}
 
@@ -255,9 +268,16 @@ export class MainApp extends HTMLElement {
 				return;
 			}
 
+			let extraInfo;
+			if ([MessageSubType.SINK_FOUND, MessageSubType.SOURCE_FOUND].includes(message.subType)) {
+				extraInfo = " (silencing similar...)";
+			}
+
+			const logStr = logString(message, extraInfo);
+
 			// TBD: Change the crude prepend if performing bad on large content
-			el.textContent = logString(message) + '\n' + el.textContent;
-			console.log(logString(message));
+			el.textContent = logStr + '\n' + el.textContent;
+			console.log(logStr);
 		}
 
 		WebUSBDeviceService.addEventListener('message', addToLog);
