@@ -337,10 +337,10 @@ export class AssistantModel extends EventTarget {
 			case MessageSubType.NEW_PA_STATE_NO_PAST:
 			break;
 			case MessageSubType.BIS_SYNCED:
-			this.handleBISSync(message, false);
+			this.handleBISSync(message, true);
 			break;
 			case MessageSubType.BIS_UNSYNCED:
-			this.handleBISSync(message, true);
+			this.handleBISSync(message, false);
 			break;
 			break;
 			default:
@@ -476,6 +476,20 @@ export class AssistantModel extends EventTarget {
 			subType: MessageSubType.ADD_SOURCE,
 			seqNo: 123,
 			payload
+		};
+
+		this.#service.sendCMD(message);
+	}
+
+	removeSource() {
+		// TODO: support selecting sink in web and firmware.
+		//       for now FW removes on connected sink(s)
+		console.log("Sending Remove Source CMD");
+
+		const message = {
+			type: Number(MessageType.CMD),
+			subType: MessageSubType.REMOVE_SOURCE,
+			seqNo: 123
 		};
 
 		this.#service.sendCMD(message);
