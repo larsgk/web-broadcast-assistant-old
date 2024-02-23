@@ -133,8 +133,8 @@ export class AssistantModel extends EventTarget {
 		}
 	}
 
-	handlePASync(message, isSynced) {
-		console.log(`Handle PA Synced`);
+	handleBISSync(message, isSynced) {
+		console.log(`Handle BIS Sync`);
 
 		const payloadArray = ltvToTvArray(message.payload);
 
@@ -159,7 +159,7 @@ export class AssistantModel extends EventTarget {
 		// If device already exists, just update RSSI, otherwise add to list
 		let sink = this.#sinks.find(i => i.addr.value === sink_addr.value);
 		if (!sink) {
-			console.warn("PA Sync w/ unknown sink addr:", sink_addr);
+			console.warn("BIS Sync w/ unknown sink addr:", sink_addr);
 			return;
 		}
 
@@ -329,15 +329,19 @@ export class AssistantModel extends EventTarget {
 			this.dispatchEvent(new CustomEvent('source-removed'));
 			break;
 			case MessageSubType.NEW_PA_STATE_NOT_SYNCED:
-			this.handlePASync(message, false);
-			break;
-			case MessageSubType.NEW_PA_STATE_INFO_REQ:
-			break;
+			// TODO: Add secondary visual feedback that we are PA un-synced
 			case MessageSubType.NEW_PA_STATE_SYNCED:
-			this.handlePASync(message, true);
-			break;
+			// TODO: Add secondary visual feedback that we are PA synced
+			case MessageSubType.NEW_PA_STATE_INFO_REQ:
 			case MessageSubType.NEW_PA_STATE_FAILED:
 			case MessageSubType.NEW_PA_STATE_NO_PAST:
+			break;
+			case MessageSubType.BIS_SYNCED:
+			this.handleBISSync(message, false);
+			break;
+			case MessageSubType.BIS_UNSYNCED:
+			this.handleBISSync(message, true);
+			break;
 			break;
 			default:
 			console.log(`Missing handler for EVT subType 0x${message.subType.toString(16)}`);
