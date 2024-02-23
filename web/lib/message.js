@@ -301,6 +301,10 @@ const parseLTVItem = (type, len, value) => {
 export const ltvToTvArray = payload => {
 	const res = [];
 
+	if (!payload) {
+		return res;
+	}
+
 	// console.log('LTV decode of: ', arrayToHex(payload));
 	let ptr = 0;
 	// Iterate over the LTV fields and convert to items in array.
