@@ -385,12 +385,23 @@ const keyName = (obj, val) => {
 	return Object.entries(obj).find(i => i[1] === val)?.[0];
 }
 
-export const logString = (message) => {
+export const logString = (message, extraInfo) => {
 	const ts = (new Date()).toISOString().substring(11,23); // "HH:mm:ss.sss"
 
 	const typeName = keyName(MessageType, message.type);
 	const subTypeName = keyName(MessageSubType, message.subType);
 
+	const entries = ltvToTvArray(message.payload);
+
+	const addr = tvArrayFindItem(entries, [
+		BT_DataType.BT_DATA_PUB_TARGET_ADDR,
+		BT_DataType.BT_DATA_RAND_TARGET_ADDR
+	]);
+
+	const err = tvArrayFindItem(entries, [
+		BT_DataType.BT_DATA_ERROR_CODE
+	])?.value;
+
 	// TODO: Expand with relevant content
-	return `[${ts}] ${typeName} ${subTypeName}`;
+	return `[${ts}] ${typeName} ${subTypeName}${!err ? '' : " ERROR: "+err} ${addr?.value || ''}${extraInfo || ''}`;
 }
