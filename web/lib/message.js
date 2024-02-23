@@ -47,6 +47,8 @@ export const MessageSubType = Object.freeze({
 	NEW_PA_STATE_SYNCED:		0x89,
 	NEW_PA_STATE_FAILED:		0x8A,
 	NEW_PA_STATE_NO_PAST:		0x8B,
+	BIS_SYNCED:			0x8C,
+	BIS_UNSYNCED:			0x8D,
 
 	HEARTBEAT:			0xFF,
 });
