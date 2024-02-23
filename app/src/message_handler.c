@@ -290,7 +290,8 @@ void message_handler(struct webusb_message *msg_ptr, uint16_t msg_length)
 
 	case MESSAGE_SUBTYPE_REMOVE_SOURCE:
 		LOG_DBG("MESSAGE_SUBTYPE_REMOVE_SOURCE (len %u)", msg_length);
-		send_response(MESSAGE_SUBTYPE_ADD_SOURCE, msg_seq_no, -1); /* Not implemeted */
+		msg_rc = remove_source();
+		send_response(MESSAGE_SUBTYPE_REMOVE_SOURCE, msg_seq_no, msg_rc);
 		break;
 
 	case MESSAGE_SUBTYPE_RESET:
