@@ -41,6 +41,9 @@ struct scan_recv_data {
 };
 
 static void broadcast_assistant_discover_cb(struct bt_conn *conn, int err, uint8_t recv_state_count);
+static void broadcast_assistant_recv_state_cb(struct bt_conn *conn, int err,
+					      const struct bt_bap_scan_delegator_recv_state *state);
+static void broadcast_assistant_recv_state_removed_cb(struct bt_conn *conn, int err, uint8_t src_id);
 static void broadcast_assistant_add_src_cb(struct bt_conn *conn, int err);
 static void connected(struct bt_conn *conn, uint8_t err);
 static void disconnected(struct bt_conn *conn, uint8_t reason);
@@ -61,6 +64,8 @@ static struct bt_le_scan_cb scan_callbacks = {
 
 static struct bt_bap_broadcast_assistant_cb broadcast_assistant_callbacks = {
 	.discover = broadcast_assistant_discover_cb,
+	.recv_state = broadcast_assistant_recv_state_cb,
+	.recv_state_removed = broadcast_assistant_recv_state_removed_cb,
 	.add_src = broadcast_assistant_add_src_cb,
 };
 
@@ -73,6 +78,7 @@ BT_CONN_CB_DEFINE(conn_callbacks) = {
 static struct bt_conn *ba_sink_conn; /* TODO: Make a list of sinks */
 static enum broadcast_assistant_state ba_state;
 static uint32_t ba_source_broadcast_id;
+static struct bt_bap_scan_delegator_recv_state recv_state = {0};
 
 /*
  * Private functions
@@ -120,6 +126,51 @@ static void broadcast_assistant_discover_cb(struct bt_conn *conn, int err, uint8
 
 	send_net_buf_event(MESSAGE_SUBTYPE_SINK_CONNECTED, evt_msg);
 	restart_scanning_if_needed();
+}
+
+static void broadcast_assistant_recv_state_cb(struct bt_conn *conn, int err,
+			   const struct bt_bap_scan_delegator_recv_state *state)
+{
+	LOG_INF("Broadcast assistant recv_state callback (%p, %d)", (void *)conn, err);
+
+	// TODO: We have to couple these to the actual sink in question, i.e. add a payload to events
+	if (state->pa_sync_state != recv_state.pa_sync_state) {
+		LOG_INF("Going from PA state %u to %u", recv_state.pa_sync_state, state->pa_sync_state);
+
+		switch (state->pa_sync_state) {
+		case BT_BAP_PA_STATE_NOT_SYNCED:
+			LOG_INF("BT_BAP_PA_STATE_NOT_SYNCED");
+			send_event(MESSAGE_SUBTYPE_NEW_PA_STATE_NOT_SYNCED, err);
+			break;
+		case BT_BAP_PA_STATE_INFO_REQ:
+			LOG_INF("BT_BAP_PA_STATE_INFO_REQ");
+			send_event(MESSAGE_SUBTYPE_NEW_PA_STATE_INFO_REQ, err);
+			break;
+		case BT_BAP_PA_STATE_SYNCED:
+			LOG_INF("BT_BAP_PA_STATE_SYNCED");
+			send_event(MESSAGE_SUBTYPE_NEW_PA_STATE_SYNCED, err);
+			break;
+		case BT_BAP_PA_STATE_FAILED:
+			LOG_INF("BT_BAP_PA_STATE_FAILED");
+			send_event(MESSAGE_SUBTYPE_NEW_PA_STATE_FAILED, err);
+			break;
+		case BT_BAP_PA_STATE_NO_PAST:
+			LOG_INF("BT_BAP_PA_STATE_NO_PAST");
+			send_event(MESSAGE_SUBTYPE_NEW_PA_STATE_NO_PAST, err);
+			break;
+		default:
+			LOG_INF("Invalid State Transition");
+			return;
+		}
+	}
+
+	memcpy(&recv_state, state, sizeof(struct bt_bap_scan_delegator_recv_state));
+}
+
+static void broadcast_assistant_recv_state_removed_cb(struct bt_conn *conn, int err, uint8_t src_id)
+{
+	LOG_INF("Broadcast assistant recv_state_removed callback (%p, %d, %u)", (void *)conn, err, src_id);
+	send_event(MESSAGE_SUBTYPE_SOURCE_REMOVED, err);
 }
 
 static void broadcast_assistant_add_src_cb(struct bt_conn *conn, int err)

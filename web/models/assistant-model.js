@@ -319,6 +319,34 @@ export class AssistantModel extends EventTarget {
 			console.log('STOP_SCAN response received');
 			this.dispatchEvent(new CustomEvent('scan-stopped'));
 			break;
+			case MessageSubType.SOURCE_ADDED:
+			console.log('SOURCE_ADDED response received');
+			this.dispatchEvent(new CustomEvent('source-added'));
+			break;
+			case MessageSubType.SOURCE_REMOVED:
+			console.log('SOURCE_REMOVED response received');
+			this.dispatchEvent(new CustomEvent('source-removed'));
+			break;
+			case MessageSubType.NEW_PA_STATE_NOT_SYNCED:
+			console.log('NEW_PA_STATE_NOT_SYNCED response received');
+			this.dispatchEvent(new CustomEvent('pa-not-synced'));
+			break;
+			case MessageSubType.NEW_PA_STATE_INFO_REQ:
+			console.log('NEW_PA_STATE_INFO_REQ response received');
+			this.dispatchEvent(new CustomEvent('pa-info-req'));
+			break;
+			case MessageSubType.NEW_PA_STATE_SYNCED:
+			console.log('NEW_PA_STATE_SYNCED response received');
+			this.dispatchEvent(new CustomEvent('pa-synced'));
+			break;
+			case MessageSubType.NEW_PA_STATE_FAILED:
+			console.log('NEW_PA_STATE_FAILED response received');
+			this.dispatchEvent(new CustomEvent('pa-failed'));
+			break;
+			case MessageSubType.NEW_PA_STATE_NO_PAST:
+			console.log('NEW_PA_STATE_NO_PAST response received');
+			this.dispatchEvent(new CustomEvent('pa-no-past'));
+			break;
 			default:
 			console.log(`Missing handler for EVT subType 0x${message.subType.toString(16)}`);
 		}
