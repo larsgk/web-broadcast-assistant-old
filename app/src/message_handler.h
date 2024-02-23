@@ -28,6 +28,7 @@ enum message_sub_type {
 	MESSAGE_SUBTYPE_CONNECT_SINK            = 0x05,
 	MESSAGE_SUBTYPE_DISCONNECT_SINK         = 0x06,
 	MESSAGE_SUBTYPE_ADD_SOURCE              = 0x07,
+	MESSAGE_SUBTYPE_REMOVE_SOURCE           = 0x08,
 	MESSAGE_SUBTYPE_RESET                   = 0x2A,
 
 	/* EVT (bit7 = 1) */

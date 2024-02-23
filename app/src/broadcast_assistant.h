@@ -21,9 +21,14 @@
 #define BT_DATA_ERROR_CODE   (BT_DATA_MANUFACTURER_DATA - 4)
 #define BT_DATA_BROADCAST_ID (BT_DATA_MANUFACTURER_DATA - 5)
 
-int scan_for_broadcast_source(uint8_t seq_no);
-int scan_for_broadcast_sink(uint8_t seq_no);
-int scan_for_broadcast_source_and_sink(uint8_t seq_no);
+enum {
+	BROADCAST_ASSISTANT_SCAN_TARGET_SOURCE = BIT(0),
+	BROADCAST_ASSISTANT_SCAN_TARGET_SINK = BIT(1),
+	BROADCAST_ASSISTANT_SCAN_TARGET_ALL =
+		(BROADCAST_ASSISTANT_SCAN_TARGET_SOURCE | BROADCAST_ASSISTANT_SCAN_TARGET_SINK)
+};
+
+int start_scan(uint8_t target);
 int stop_scanning(void);
 int connect_to_sink(bt_addr_le_t *bt_addr_le);
 int disconnect_from_sink(bt_addr_le_t *bt_addr_le);
