@@ -18,27 +18,27 @@ import {
 */
 
 /**
- * Source device structure
- *
- * {
- * 	bt_name: string | undefined,
- * 	broadcast_name: string | undefined
- * 	broadcast_id: uint24, (UNIQUE IDENTIFIER)
- * 	rssi: int8
- * }
- *
- * Sink device structure
- *
- * {
- * 	bt_addr: string | undefined, (UNIQUE IDENTIFIER)
- * 	bt_name: string | undefined,
- * 	connection_state: boolean,
- * 	security_level: uint8,
- * 	bass_state: idle | configured | streaming,
- * 	broadcast_id: uint24,
- * 	rssi: int8
- * }
- */
+* Source device structure
+*
+*
+* 	bt_name: string | undefined,
+* 	broadcast_name: string | undefined
+* 	broadcast_id: uint24, (UNIQUE IDENTIFIER)
+* 	rssi: int8
+*
+*
+* Sink device structure
+*
+*
+* 	bt_addr: string | undefined, (UNIQUE IDENTIFIER)
+* 	bt_name: string | undefined,
+* 	connection_state: boolean,
+* 	security_level: uint8,
+* 	bass_state: idle | configured | streaming,
+* 	broadcast_id: uint24,
+* 	rssi: int8
+*
+*/
 
 export class AssistantModel extends EventTarget {
 	#service
@@ -133,6 +133,52 @@ export class AssistantModel extends EventTarget {
 		}
 	}
 
+	handleSourceAdded(message) {
+		console.log(`Handle Source added`);
+
+		const payloadArray = ltvToTvArray(message.payload);
+
+		const sink_addr = tvArrayFindItem(payloadArray, [
+			BT_DataType.BT_DATA_PUB_TARGET_ADDR,
+			BT_DataType.BT_DATA_RAND_TARGET_ADDR
+		]);
+
+		if (!sink_addr) {
+			// TBD: Throw exception?
+			return;
+		}
+
+		const err = tvArrayFindItem(payloadArray, [
+			BT_DataType.BT_DATA_ERROR_CODE
+		])?.value;
+
+		const broadcast_id = tvArrayFindItem(payloadArray, [
+			BT_DataType.BT_DATA_BROADCAST_ID
+		])?.value
+
+		// If device already exists, just update RSSI, otherwise add to list
+		let sink = this.#sinks.find(i => i.addr.value === sink_addr.value);
+		if (!sink) {
+			console.warn("Source added to unknown sink addr:", sink_addr);
+			return;
+		}
+
+		let source = this.#sources.find(i => i.broadcast_id === broadcast_id);
+		if (!source) {
+			console.warn("Unknown source with broadcast ID:", broadcast_id?.toString(16).padStart(6, '0'));
+			return;
+		}
+
+		this.#sources.forEach( s => {
+			s.state = source === s ? "selected" : undefined;
+			this.dispatchEvent(new CustomEvent('source-updated', {detail: { source: s }}));
+		});
+
+		sink.source_added = source;
+		this.dispatchEvent(new CustomEvent('sink-updated', {detail: { sink }}));
+	}
+
+
 	handleSinkFound(message) {
 		console.log(`Handle found Sink`);
 
@@ -205,9 +251,14 @@ export class AssistantModel extends EventTarget {
 				console.log("Error code", err);
 				sink.state = "failed";
 			} else {
-				sink.state = message.subType === MessageSubType.SINK_CONNECTED ? "connected" : undefined;
+				if (message.subType === MessageSubType.SINK_CONNECTED) {
+					sink.state = "connected";
+					this.dispatchEvent(new CustomEvent('sink-updated', {detail: { sink }}));
+				} else {
+					sink.state = "";
+					this.dispatchEvent(new CustomEvent('sink-disconnected', {detail: { sink }}));
+				}
 			}
-			this.dispatchEvent(new CustomEvent('sink-updated', {detail: { sink }}));
 		}
 	}
 
@@ -260,6 +311,9 @@ export class AssistantModel extends EventTarget {
 			break;
 			case MessageSubType.SOURCE_FOUND:
 			this.handleSourceFound(message);
+			break;
+			case MessageSubType.SOURCE_ADDED:
+			this.handleSourceAdded(message);
 			break;
 			case MessageSubType.STOP_SCAN:
 			console.log('STOP_SCAN response received');
