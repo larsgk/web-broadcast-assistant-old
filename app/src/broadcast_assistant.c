@@ -32,15 +32,19 @@ struct scan_recv_data {
 	bool has_pacs;
 };
 
-static void broadcast_assistant_discover_cb(struct bt_conn *conn, int err, uint8_t recv_state_count);
+static void broadcast_assistant_discover_cb(struct bt_conn *conn, int err,
+					    uint8_t recv_state_count);
 static void broadcast_assistant_recv_state_cb(struct bt_conn *conn, int err,
 					      const struct bt_bap_scan_delegator_recv_state *state);
-static void broadcast_assistant_recv_state_removed_cb(struct bt_conn *conn, int err, uint8_t src_id);
+static void broadcast_assistant_recv_state_removed_cb(struct bt_conn *conn, int err,
+						      uint8_t src_id);
 static void broadcast_assistant_add_src_cb(struct bt_conn *conn, int err);
-static void bap_broadcast_assistant_mod_src_cb(struct bt_conn *conn, int err);
+static void broadcast_assistant_mod_src_cb(struct bt_conn *conn, int err);
+static void broadcast_assistant_rem_src_cb(struct bt_conn *conn, int err);
 static void connected(struct bt_conn *conn, uint8_t err);
 static void disconnected(struct bt_conn *conn, uint8_t reason);
-static void security_changed_cb(struct bt_conn *conn, bt_security_t level, enum bt_security_err err);
+static void security_changed_cb(struct bt_conn *conn, bt_security_t level,
+				enum bt_security_err err);
 static void restart_scanning_if_needed(void);
 static bool device_found(struct bt_data *data, void *user_data);
 static bool scan_for_source(const struct bt_le_scan_recv_info *info, struct net_buf_simple *ad,
@@ -60,7 +64,8 @@ static struct bt_bap_broadcast_assistant_cb broadcast_assistant_callbacks = {
 	.recv_state = broadcast_assistant_recv_state_cb,
 	.recv_state_removed = broadcast_assistant_recv_state_removed_cb,
 	.add_src = broadcast_assistant_add_src_cb,
-	.mod_src = bap_broadcast_assistant_mod_src_cb,
+	.mod_src = broadcast_assistant_mod_src_cb,
+	.rem_src = broadcast_assistant_rem_src_cb,
 };
 
 BT_CONN_CB_DEFINE(conn_callbacks) = {
@@ -72,6 +77,7 @@ BT_CONN_CB_DEFINE(conn_callbacks) = {
 static struct bt_conn *ba_sink_conn; /* TODO: Make a list of sinks */
 static uint8_t ba_scan_target;
 static uint32_t ba_source_broadcast_id;
+static uint8_t ba_source_id; /* Source ID of the receive state */
 static struct bt_bap_scan_delegator_recv_state recv_state = {0};
 
 /*
@@ -142,7 +148,8 @@ static void broadcast_assistant_recv_state_cb(struct bt_conn *conn, int err,
 			evt_msg_sub_type = MESSAGE_SUBTYPE_NEW_PA_STATE_INFO_REQ;
 			break;
 		case BT_BAP_PA_STATE_SYNCED:
-			LOG_INF("BT_BAP_PA_STATE_SYNCED");
+			LOG_INF("BT_BAP_PA_STATE_SYNCED (src_id = %u)", state->src_id);
+			ba_source_id = state->src_id; /* store source ID of the receive state */
 			evt_msg_sub_type = MESSAGE_SUBTYPE_NEW_PA_STATE_SYNCED;
 			break;
 		case BT_BAP_PA_STATE_FAILED:
@@ -263,9 +270,25 @@ static void broadcast_assistant_add_src_cb(struct bt_conn *conn, int err)
 	send_net_buf_event(MESSAGE_SUBTYPE_SOURCE_ADDED, evt_msg);
 }
 
-static void bap_broadcast_assistant_mod_src_cb(struct bt_conn *conn, int err)
+static void broadcast_assistant_mod_src_cb(struct bt_conn *conn, int err)
 {
-	LOG_INF("BASS modify source (err: %d)", err);
+	if (err) {
+		LOG_ERR("BASS modify source (err: %d)", err);
+		return;
+	}
+
+	LOG_INF("BASS modify source (bis_sync = 0, pa_sync = false) ok -> Now remove source");
+
+	err = bt_bap_broadcast_assistant_rem_src(conn, ba_source_id);
+	if (err) {
+		LOG_ERR("BASS remove source (err: %d)", err);
+	}
+}
+
+static void broadcast_assistant_rem_src_cb(struct bt_conn *conn, int err)
+{
+	LOG_INF("BASS remove source (err: %d)", err);
+	ba_source_id = 0;
 }
 
 static void connected(struct bt_conn *conn, uint8_t err)
@@ -821,12 +844,12 @@ int remove_source(void)
 {
 	LOG_INF("Removing broadcast source...");
 
-	struct bt_bap_scan_delegator_subgroup subgroup = {0};
+	struct bt_bap_scan_delegator_subgroup subgroup = {0}; /* bis_sync = 0 */
 	struct bt_bap_broadcast_assistant_mod_src_param param = { 0 };
 	int err = 0;
 
-	param.src_id = 1;
-	param.pa_sync = true;
+	param.src_id = ba_source_id;
+	param.pa_sync = false; /* stop sync to periodic advertisements */
 	param.pa_interval = BT_BAP_PA_INTERVAL_UNKNOWN;
 	param.num_subgroups = 1; /* TODO: Support multiple subgroups */
 	param.subgroups = &subgroup;
