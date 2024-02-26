@@ -58,6 +58,8 @@ template.innerHTML = `
 	align-items: center
 }
 
+.right-align { margin-left: auto; }
+
 button {
 	display: block;
 	position: relative;
@@ -159,7 +161,9 @@ button:disabled {
 		<div class="col">
 			<div class="row">
 			<h2>WebUSB Broadcast Assistant</h2>
+			<div class="right-align">
 			<heartbeat-indicator></heartbeat-indicator>
+			</div>
 			</div>
 
 			<div class="row">
