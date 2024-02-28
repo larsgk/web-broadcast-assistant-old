@@ -256,7 +256,7 @@ export class AssistantModel extends EventTarget {
 					sink.state = "connected";
 					this.dispatchEvent(new CustomEvent('sink-updated', {detail: { sink }}));
 				} else {
-					sink.state = "";
+					this.#sinks.splice(this.#sinks.indexOf(sink, 1));
 					this.dispatchEvent(new CustomEvent('sink-disconnected', {detail: { sink }}));
 				}
 			}
