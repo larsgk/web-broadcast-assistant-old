@@ -49,6 +49,7 @@ export const MessageSubType = Object.freeze({
 	NEW_PA_STATE_NO_PAST:		0x8B,
 	BIS_SYNCED:			0x8C,
 	BIS_UNSYNCED:			0x8D,
+	IDENTITY_RESOLVED:		0x8E,
 
 	HEARTBEAT:			0xFF,
 });
@@ -69,6 +70,8 @@ export const BT_DataType = Object.freeze({
 	BT_DATA_BROADCAST_NAME:		0x30,	// utf8 (variable len)
 
 	// The following types are created for this app (not standard)
+	BT_DATA_IDENTITY:		0xf8,   // uint8 (type) + uint8[6] (addr)
+	BT_DATA_RPA:			0xf9,   // uint8 (type) + uint8[6] (addr)
 	BT_DATA_BROADCAST_ID:		0xfa,	// uint24
 	BT_DATA_ERROR_CODE:		0xfb,	// int32
 	BT_DATA_PA_INTERVAL:		0xfc,	// uint16
@@ -169,11 +172,11 @@ const bufToAddressString = (data) => {
 		return `UNKNOWN ADDRESS`
 	}
 
-	return Array.from(data, b => b.toString(16).padStart(2, '0')).join(':').toUpperCase();
+	return Array.from(data, b => b.toString(16).padStart(2, '0')).reverse().join(':').toUpperCase();
 }
 
 const addressStringToArray = (str) => {
-	return str.split(':').map(v => Number.parseInt(v, 16));
+	return str.split(':').reverse().map(v => Number.parseInt(v, 16));
 }
 
 const uintToArray = (num, length) => {
@@ -273,7 +276,7 @@ const parseLTVItem = (type, len, value) => {
 		break;
 		case BT_DataType.BT_DATA_PUB_TARGET_ADDR:
 		case BT_DataType.BT_DATA_RAND_TARGET_ADDR:
-		item.value = bufToAddressString(value)
+		item.value = bufToAddressString(value);
 		break;
 		case BT_DataType.BT_DATA_RSSI:
 		case BT_DataType.BT_DATA_ERROR_CODE:
@@ -283,6 +286,15 @@ const parseLTVItem = (type, len, value) => {
 		case BT_DataType.BT_DATA_PA_INTERVAL:
 		case BT_DataType.BT_DATA_SID:
 		item.value = bufToInt(value, false);
+		break;
+		case BT_DataType.BT_DATA_RPA:
+		case BT_DataType.BT_DATA_IDENTITY:
+		item.value = {
+			type: value[0],
+			addr: value.slice(1)
+		}
+		const subTypeName = keyName(MessageSubType, type);
+		console.log(subTypeName, item.value, bufToAddressString(item.value.addr));
 		break;
 		default:
 		item.value = "UNHANDLED";
