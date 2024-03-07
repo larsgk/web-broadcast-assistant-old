@@ -45,6 +45,9 @@ static void connected(struct bt_conn *conn, uint8_t err);
 static void disconnected(struct bt_conn *conn, uint8_t reason);
 static void security_changed_cb(struct bt_conn *conn, bt_security_t level,
 				enum bt_security_err err);
+static void identity_resolved_cb(struct bt_conn *conn,
+				 const bt_addr_le_t *rpa,
+				 const bt_addr_le_t *identity);
 static void restart_scanning_if_needed(void);
 static bool device_found(struct bt_data *data, void *user_data);
 static bool scan_for_source(const struct bt_le_scan_recv_info *info, struct net_buf_simple *ad,
@@ -71,7 +74,8 @@ static struct bt_bap_broadcast_assistant_cb broadcast_assistant_callbacks = {
 BT_CONN_CB_DEFINE(conn_callbacks) = {
 	.connected = connected,
 	.disconnected = disconnected,
-	.security_changed = security_changed_cb
+	.security_changed = security_changed_cb,
+	.identity_resolved = identity_resolved_cb
 };
 
 static struct bt_conn *ba_sink_conn; /* TODO: Make a list of sinks */
@@ -329,19 +333,11 @@ static void connected(struct bt_conn *conn, uint8_t err)
 		return;
 	}
 
-	/* Connected. Do BAP broadcast assistant discover */
-	LOG_INF("Broadcast assistant discover");
-	err = bt_bap_broadcast_assistant_discover(ba_sink_conn);
+	err = bt_conn_set_security(conn, BT_SECURITY_L2 | BT_SECURITY_FORCE_PAIR);
 	if (err) {
-		LOG_ERR("Broadcast assistant discover (err %d)", err);
-		err = bt_conn_disconnect(ba_sink_conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
-		if (err) {
-			LOG_ERR("Failed to disconnect (err %d)", err);
-		}
-		restart_scanning_if_needed();
-
-		return; /* return and wait for disconnected callback (assume no err) */
+		LOG_ERR("Setting security failed (err %d)", err);
 	}
+
 }
 
 static void disconnected(struct bt_conn *conn, uint8_t reason)
@@ -381,6 +377,49 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 static void security_changed_cb(struct bt_conn *conn, bt_security_t level, enum bt_security_err err)
 {
 	LOG_INF("Broadcast assistant security_changed callback (%p, %d, err:%d)", (void *)conn, level, err);
+
+
+	/* Connected. Do BAP broadcast assistant discover */
+	LOG_INF("Broadcast assistant discover");
+	err = bt_bap_broadcast_assistant_discover(ba_sink_conn);
+	if (err) {
+		LOG_ERR("Broadcast assistant discover (err %d)", err);
+		err = bt_conn_disconnect(ba_sink_conn, BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+		if (err) {
+			LOG_ERR("Failed to disconnect (err %d)", err);
+		}
+		restart_scanning_if_needed();
+
+		return; /* return and wait for disconnected callback (assume no err) */
+	}
+}
+
+static void identity_resolved_cb(struct bt_conn *conn, const bt_addr_le_t *rpa,
+				 const bt_addr_le_t *identity) {
+	char rpa_str[BT_ADDR_LE_STR_LEN];
+	char identity_str[BT_ADDR_LE_STR_LEN];
+
+	bt_addr_le_to_str(rpa, rpa_str, sizeof(rpa_str));
+	bt_addr_le_to_str(identity, identity_str, sizeof(identity_str));
+	LOG_INF("Identity resolved %s -> %s", rpa_str, identity_str);
+
+	enum message_sub_type evt_msg_sub_type;
+	struct net_buf *evt_msg;
+
+	evt_msg_sub_type = MESSAGE_SUBTYPE_IDENTITY_RESOLVED;
+	evt_msg = message_alloc_tx_message();
+
+	net_buf_add_u8(evt_msg, 1 + BT_ADDR_LE_SIZE);
+	net_buf_add_u8(evt_msg, BT_DATA_RPA);
+	net_buf_add_u8(evt_msg, rpa->type);
+	net_buf_add_mem(evt_msg, &rpa->a, sizeof(bt_addr_t));
+
+	net_buf_add_u8(evt_msg, 1 + BT_ADDR_LE_SIZE);
+	net_buf_add_u8(evt_msg, BT_DATA_IDENTITY);
+	net_buf_add_u8(evt_msg, identity->type);
+	net_buf_add_mem(evt_msg, &identity->a, sizeof(bt_addr_t));
+
+	send_net_buf_event(evt_msg_sub_type, evt_msg);
 }
 
 static void restart_scanning_if_needed(void)
