@@ -191,15 +191,11 @@ bool ltv_found(struct bt_data *data, void *user_data)
 		_parsed->broadcast_id = sys_get_le24(data->data);
 		LOG_DBG("BT_DATA_BROADCAST_ID");
 		return true;
-	case BT_DATA_PUB_TARGET_ADDR:
-	case BT_DATA_RAND_TARGET_ADDR:
+	case BT_DATA_RPA:
+	case BT_DATA_IDENTITY:
 		char addr_str[BT_ADDR_LE_STR_LEN];
-
-		_parsed->addr.type = data->type == BT_DATA_PUB_TARGET_ADDR ? BT_ADDR_LE_PUBLIC
-									   : BT_ADDR_LE_RANDOM;
-		memcpy(_parsed->addr.a.val, data->data, sizeof(bt_addr_t));
-		LOG_DBG("%s", BT_DATA_PUB_TARGET_ADDR ? "BT_DATA_PUB_TARGET_ADDR" : "BT_DATA_RAND_TARGET_ADDR");
-
+		_parsed->addr.type = data->data[0];
+		memcpy(&_parsed->addr.a, &data->data[1], sizeof(bt_addr_t));
 		bt_addr_le_to_str(&_parsed->addr, addr_str, sizeof(addr_str));
 		LOG_DBG("Addr: %s", addr_str);
 		return true;
