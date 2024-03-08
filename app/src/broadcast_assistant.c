@@ -111,16 +111,12 @@ static void broadcast_assistant_discover_cb(struct bt_conn *conn, int err, uint8
 	bt_addr_le_to_str(bt_addr_le, addr_str, sizeof(addr_str));
 	LOG_DBG("Connected to %s", addr_str);
 
-	/* bt_addr_le */
-	if (bt_addr_le->type == BT_ADDR_LE_PUBLIC) {
-		net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
-		net_buf_add_u8(evt_msg, BT_DATA_PUB_TARGET_ADDR);
-		net_buf_add_mem(evt_msg, &bt_addr_le->a, sizeof(bt_addr_t));
-	} else if (bt_addr_le->type == BT_ADDR_LE_RANDOM) {
-		net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
-		net_buf_add_u8(evt_msg, BT_DATA_RAND_TARGET_ADDR);
-		net_buf_add_mem(evt_msg, &bt_addr_le->a, sizeof(bt_addr_t));
-	}
+	/* Bluetooth LE Device Address */
+	net_buf_add_u8(evt_msg, 1 + BT_ADDR_LE_SIZE);
+	net_buf_add_u8(evt_msg, bt_addr_le_is_identity(bt_addr_le) ? BT_DATA_IDENTITY : BT_DATA_RPA);
+	net_buf_add_u8(evt_msg, bt_addr_le->type);
+	net_buf_add_mem(evt_msg, &bt_addr_le->a, sizeof(bt_addr_t));
+
 	/* error code */
 	net_buf_add_u8(evt_msg, 1 /* len of BT_DATA type */ + sizeof(int32_t));
 	net_buf_add_u8(evt_msg, BT_DATA_ERROR_CODE);
@@ -138,7 +134,7 @@ static void broadcast_assistant_recv_state_cb(struct bt_conn *conn, int err,
 	if (state->pa_sync_state != recv_state.pa_sync_state) {
 		struct net_buf *evt_msg;
 		enum message_sub_type evt_msg_sub_type;
-		const bt_addr_le_t *addr;
+		const bt_addr_le_t *bt_addr_le;
 
 		LOG_INF("Going from PA state %u to %u", recv_state.pa_sync_state, state->pa_sync_state);
 
@@ -171,17 +167,12 @@ static void broadcast_assistant_recv_state_cb(struct bt_conn *conn, int err,
 
 		evt_msg = message_alloc_tx_message();
 
-		/* LE addr */
-		addr = bt_conn_get_dst(conn);
-		if (addr->type == BT_ADDR_LE_PUBLIC) {
-			net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
-			net_buf_add_u8(evt_msg, BT_DATA_PUB_TARGET_ADDR);
-			net_buf_add_mem(evt_msg, &addr->a, sizeof(bt_addr_t));
-		} else if (addr->type == BT_ADDR_LE_RANDOM) {
-			net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
-			net_buf_add_u8(evt_msg, BT_DATA_RAND_TARGET_ADDR);
-			net_buf_add_mem(evt_msg, &addr->a, sizeof(bt_addr_t));
-		}
+		/* Bluetooth LE Device Address */
+		bt_addr_le = bt_conn_get_dst(conn);
+		net_buf_add_u8(evt_msg, 1 + BT_ADDR_LE_SIZE);
+		net_buf_add_u8(evt_msg, bt_addr_le_is_identity(bt_addr_le) ? BT_DATA_IDENTITY : BT_DATA_RPA);
+		net_buf_add_u8(evt_msg, bt_addr_le->type);
+		net_buf_add_mem(evt_msg, &bt_addr_le->a, sizeof(bt_addr_t));
 
 		/* broadcast id */
 		net_buf_add_u8(evt_msg, 5);
@@ -195,7 +186,7 @@ static void broadcast_assistant_recv_state_cb(struct bt_conn *conn, int err,
 		if (state->subgroups[i].bis_sync != recv_state.subgroups[i].bis_sync) {
 			struct net_buf *evt_msg;
 			enum message_sub_type evt_msg_sub_type;
-			const bt_addr_le_t *addr;
+			const bt_addr_le_t *bt_addr_le;
 
 			/* BIS sync changed */
 			evt_msg_sub_type = state->subgroups[i].bis_sync == 0
@@ -208,17 +199,12 @@ static void broadcast_assistant_recv_state_cb(struct bt_conn *conn, int err,
 
 			evt_msg = message_alloc_tx_message();
 
-			/* LE addr */
-			addr = bt_conn_get_dst(conn);
-			if (addr->type == BT_ADDR_LE_PUBLIC) {
-				net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
-				net_buf_add_u8(evt_msg, BT_DATA_PUB_TARGET_ADDR);
-				net_buf_add_mem(evt_msg, &addr->a, sizeof(bt_addr_t));
-			} else if (addr->type == BT_ADDR_LE_RANDOM) {
-				net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
-				net_buf_add_u8(evt_msg, BT_DATA_RAND_TARGET_ADDR);
-				net_buf_add_mem(evt_msg, &addr->a, sizeof(bt_addr_t));
-			}
+			/* Bluetooth LE Device Address */
+			bt_addr_le = bt_conn_get_dst(conn);
+			net_buf_add_u8(evt_msg, 1 + BT_ADDR_LE_SIZE);
+			net_buf_add_u8(evt_msg, bt_addr_le_is_identity(bt_addr_le) ? BT_DATA_IDENTITY : BT_DATA_RPA);
+			net_buf_add_u8(evt_msg, bt_addr_le->type);
+			net_buf_add_mem(evt_msg, &bt_addr_le->a, sizeof(bt_addr_t));
 
 			/* broadcast id */
 			net_buf_add_u8(evt_msg, 5);
@@ -252,16 +238,12 @@ static void broadcast_assistant_add_src_cb(struct bt_conn *conn, int err)
 	bt_addr_le_to_str(bt_addr_le, addr_str, sizeof(addr_str));
 	LOG_DBG("Source added for %s", addr_str);
 
-	/* bt_addr_le */
-	if (bt_addr_le->type == BT_ADDR_LE_PUBLIC) {
-		net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
-		net_buf_add_u8(evt_msg, BT_DATA_PUB_TARGET_ADDR);
-		net_buf_add_mem(evt_msg, &bt_addr_le->a, sizeof(bt_addr_t));
-	} else if (bt_addr_le->type == BT_ADDR_LE_RANDOM) {
-		net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
-		net_buf_add_u8(evt_msg, BT_DATA_RAND_TARGET_ADDR);
-		net_buf_add_mem(evt_msg, &bt_addr_le->a, sizeof(bt_addr_t));
-	}
+	/* Bluetooth LE Device Address */
+	net_buf_add_u8(evt_msg, 1 + BT_ADDR_LE_SIZE);
+	net_buf_add_u8(evt_msg, bt_addr_le_is_identity(bt_addr_le) ? BT_DATA_IDENTITY : BT_DATA_RPA);
+	net_buf_add_u8(evt_msg, bt_addr_le->type);
+	net_buf_add_mem(evt_msg, &bt_addr_le->a, sizeof(bt_addr_t));
+
 	/* broadcast id */
 	net_buf_add_u8(evt_msg, 5);
 	net_buf_add_u8(evt_msg, BT_DATA_BROADCAST_ID);
@@ -310,16 +292,11 @@ static void connected(struct bt_conn *conn, uint8_t err)
 
 		evt_msg = message_alloc_tx_message();
 		bt_addr_le = bt_conn_get_dst(conn);
-		/* bt_addr_le */
-		if (bt_addr_le->type == BT_ADDR_LE_PUBLIC) {
-			net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
-			net_buf_add_u8(evt_msg, BT_DATA_PUB_TARGET_ADDR);
-			net_buf_add_mem(evt_msg, &bt_addr_le->a, sizeof(bt_addr_t));
-		} else if (bt_addr_le->type == BT_ADDR_LE_RANDOM) {
-			net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
-			net_buf_add_u8(evt_msg, BT_DATA_RAND_TARGET_ADDR);
-			net_buf_add_mem(evt_msg, &bt_addr_le->a, sizeof(bt_addr_t));
-		}
+		/* Bluetooth LE Device Address */
+		net_buf_add_u8(evt_msg, 1 + BT_ADDR_LE_SIZE);
+		net_buf_add_u8(evt_msg, bt_addr_le_is_identity(bt_addr_le) ? BT_DATA_IDENTITY : BT_DATA_RPA);
+		net_buf_add_u8(evt_msg, bt_addr_le->type);
+		net_buf_add_mem(evt_msg, &bt_addr_le->a, sizeof(bt_addr_t));
 		/* error code */
 		net_buf_add_u8(evt_msg, 1 /* len of BT_DATA type */ + sizeof(int32_t));
 		net_buf_add_u8(evt_msg, BT_DATA_ERROR_CODE);
@@ -353,16 +330,11 @@ static void disconnected(struct bt_conn *conn, uint8_t reason)
 
 	bt_addr_le = bt_conn_get_dst(conn);
 	evt_msg = message_alloc_tx_message();
-	/* bt_addr_le */
-	if (bt_addr_le->type == BT_ADDR_LE_PUBLIC) {
-		net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
-		net_buf_add_u8(evt_msg, BT_DATA_PUB_TARGET_ADDR);
-		net_buf_add_mem(evt_msg, &bt_addr_le->a, sizeof(bt_addr_t));
-	} else if (bt_addr_le->type == BT_ADDR_LE_RANDOM) {
-		net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
-		net_buf_add_u8(evt_msg, BT_DATA_RAND_TARGET_ADDR);
-		net_buf_add_mem(evt_msg, &bt_addr_le->a, sizeof(bt_addr_t));
-	}
+	/* Bluetooth LE Device Address */
+	net_buf_add_u8(evt_msg, 1 + BT_ADDR_LE_SIZE);
+	net_buf_add_u8(evt_msg, bt_addr_le_is_identity(bt_addr_le) ? BT_DATA_IDENTITY : BT_DATA_RPA);
+	net_buf_add_u8(evt_msg, bt_addr_le->type);
+	net_buf_add_mem(evt_msg, &bt_addr_le->a, sizeof(bt_addr_t));
 	/* error code */
 	net_buf_add_u8(evt_msg, 1 /* len of BT_DATA type */ + sizeof(int32_t));
 	net_buf_add_u8(evt_msg, BT_DATA_ERROR_CODE);
@@ -578,7 +550,10 @@ static bool scan_for_sink(const struct bt_le_scan_recv_info *info, struct net_bu
 	bt_data_parse(ad, device_found, (void *)sr_data);
 
 	if (sr_data->has_bass) {
-		LOG_INF("Broadcast Sink Found: [\"%s\"]", sr_data->bt_name);
+		char addr_str[BT_ADDR_LE_STR_LEN];
+
+		bt_addr_le_to_str(info->addr, addr_str, sizeof(addr_str));
+		LOG_INF("Broadcast Sink Found: [\"%s\", %s]", sr_data->bt_name, addr_str);
 
 		return true;
 	}
@@ -611,17 +586,12 @@ static void scan_recv_cb(const struct bt_le_scan_recv_info *info, struct net_buf
 			net_buf_add_u8(evt_msg, 2);
 			net_buf_add_u8(evt_msg, BT_DATA_RSSI);
 			net_buf_add_u8(evt_msg, info->rssi);
-			/* bt_addr_le */
-			if (info->addr->type == BT_ADDR_LE_PUBLIC) {
-				net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
-				net_buf_add_u8(evt_msg, BT_DATA_PUB_TARGET_ADDR);
-				net_buf_add_mem(evt_msg, &info->addr->a, sizeof(bt_addr_t));
-			} else if (info->addr->type == BT_ADDR_LE_RANDOM) {
-				net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
-				net_buf_add_u8(evt_msg, BT_DATA_RAND_TARGET_ADDR);
-				net_buf_add_mem(evt_msg, &info->addr->a, sizeof(bt_addr_t));
-			}
-
+			/* Bluetooth LE Device Address */
+			net_buf_add_u8(evt_msg, 1 + BT_ADDR_LE_SIZE);
+			net_buf_add_u8(evt_msg, bt_addr_le_is_identity(info->addr) ? BT_DATA_IDENTITY : BT_DATA_RPA);
+			net_buf_add_u8(evt_msg, info->addr->type);
+			net_buf_add_mem(evt_msg, &info->addr->a, sizeof(bt_addr_t));
+			/* BT name */
 			net_buf_add_u8(evt_msg, strlen(sr_data.bt_name) + 1);
 			net_buf_add_u8(evt_msg, sr_data.bt_name_type);
 			net_buf_add_mem(evt_msg, &sr_data.bt_name, strlen(sr_data.bt_name));
@@ -660,17 +630,12 @@ static void scan_recv_cb(const struct bt_le_scan_recv_info *info, struct net_buf
 			net_buf_add_u8(evt_msg, 2);
 			net_buf_add_u8(evt_msg, BT_DATA_RSSI);
 			net_buf_add_u8(evt_msg, info->rssi);
-			/* bt_addr_le */
-			if (info->addr->type == BT_ADDR_LE_PUBLIC) {
-				net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
-				net_buf_add_u8(evt_msg, BT_DATA_PUB_TARGET_ADDR);
-				net_buf_add_mem(evt_msg, &info->addr->a, sizeof(bt_addr_t));
-			} else if (info->addr->type == BT_ADDR_LE_RANDOM) {
-				net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
-				net_buf_add_u8(evt_msg, BT_DATA_RAND_TARGET_ADDR);
-				net_buf_add_mem(evt_msg, &info->addr->a, sizeof(bt_addr_t));
-			}
-
+			/* Bluetooth LE Device Address */
+			net_buf_add_u8(evt_msg, 1 + BT_ADDR_LE_SIZE);
+			net_buf_add_u8(evt_msg, bt_addr_le_is_identity(info->addr) ? BT_DATA_IDENTITY : BT_DATA_RPA);
+			net_buf_add_u8(evt_msg, info->addr->type);
+			net_buf_add_mem(evt_msg, &info->addr->a, sizeof(bt_addr_t));
+			/* BT name */
 			net_buf_add_u8(evt_msg, strlen(sr_data.bt_name) + 1);
 			net_buf_add_u8(evt_msg, sr_data.bt_name_type);
 			net_buf_add_mem(evt_msg, &sr_data.bt_name, strlen(sr_data.bt_name));
@@ -818,16 +783,11 @@ int disconnect_from_sink(bt_addr_le_t *bt_addr_le)
 
 			LOG_ERR("Failed to disconnect (err %d)", err);
 			evt_msg = message_alloc_tx_message();
-			/* bt_addr_le */
-			if (bt_addr_le->type == BT_ADDR_LE_PUBLIC) {
-				net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
-				net_buf_add_u8(evt_msg, BT_DATA_PUB_TARGET_ADDR);
-				net_buf_add_mem(evt_msg, &bt_addr_le->a, sizeof(bt_addr_t));
-			} else if (bt_addr_le->type == BT_ADDR_LE_RANDOM) {
-				net_buf_add_u8(evt_msg, 1 + BT_ADDR_SIZE);
-				net_buf_add_u8(evt_msg, BT_DATA_RAND_TARGET_ADDR);
-				net_buf_add_mem(evt_msg, &bt_addr_le->a, sizeof(bt_addr_t));
-			}
+			/* Bluetooth LE Device Address */
+			net_buf_add_u8(evt_msg, 1 + BT_ADDR_LE_SIZE);
+			net_buf_add_u8(evt_msg, bt_addr_le_is_identity(bt_addr_le) ? BT_DATA_IDENTITY : BT_DATA_RPA);
+			net_buf_add_u8(evt_msg, bt_addr_le->type);
+			net_buf_add_mem(evt_msg, &bt_addr_le->a, sizeof(bt_addr_t));
 			/* error code */
 			net_buf_add_u8(evt_msg, 1 /* len of BT_DATA type */ + sizeof(int32_t));
 			net_buf_add_u8(evt_msg, BT_DATA_ERROR_CODE);
