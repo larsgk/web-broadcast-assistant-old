@@ -64,8 +64,6 @@ export const BT_DataType = Object.freeze({
 	BT_DATA_NAME_COMPLETE:		0x09,	// utf8 (variable len)
 
 	BT_DATA_SVC_DATA16:		0x16,
-	BT_DATA_PUB_TARGET_ADDR:	0x17,	// uint8[6]
-	BT_DATA_RAND_TARGET_ADDR:	0x18,	// uint8[6]
 
 	BT_DATA_BROADCAST_NAME:		0x30,	// utf8 (variable len)
 
@@ -355,9 +353,9 @@ export const tvArrayToLtv = arr => {
 
 		// TODO: Add handlers for types needed for commands.
 		switch (type) {
-			case BT_DataType.BT_DATA_PUB_TARGET_ADDR:
-			case BT_DataType.BT_DATA_RAND_TARGET_ADDR:
-			outArr = addressStringToArray(value);
+			case BT_DataType.BT_DATA_RPA:
+			case BT_DataType.BT_DATA_IDENTITY:
+			outArr = [value.type, ...Array.from(value.addr)];
 			break;
 			case BT_DataType.BT_DATA_BROADCAST_ID:
 			outArr = uintToArray(value, 3);	//uint24
@@ -409,14 +407,20 @@ export const logString = (message, extraInfo) => {
 	const entries = ltvToTvArray(message.payload);
 
 	const addr = tvArrayFindItem(entries, [
-		BT_DataType.BT_DATA_PUB_TARGET_ADDR,
-		BT_DataType.BT_DATA_RAND_TARGET_ADDR
-	]);
+		BT_DataType.BT_DATA_RPA,
+		BT_DataType.BT_DATA_IDENTITY
+	])?.value;
+
+	let addrStr = "";
+
+	if (addr && addr.addr) {
+		addrStr = bufToAddressString(addr.addr);
+	}
 
 	const err = tvArrayFindItem(entries, [
 		BT_DataType.BT_DATA_ERROR_CODE
 	])?.value;
 
 	// TODO: Expand with relevant content
-	return `[${ts}] ${typeName} ${subTypeName}${!err ? '' : " ERROR: "+err} ${addr?.value || ''}${extraInfo || ''}`;
+	return `[${ts}] ${typeName} ${subTypeName}${!err ? '' : " ERROR: "+err} ${addrStr}${extraInfo || ''}`;
 }
