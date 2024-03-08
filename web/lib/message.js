@@ -167,14 +167,6 @@ export const arrayToMsg = data => {
 
 const utf8decoder = new TextDecoder();
 
-const bufToAddressString = (data) => {
-	if (data.length != 6) {
-		return `UNKNOWN ADDRESS`
-	}
-
-	return Array.from(data, b => b.toString(16).padStart(2, '0')).reverse().join(':').toUpperCase();
-}
-
 const addressStringToArray = (str) => {
 	return str.split(':').reverse().map(v => Number.parseInt(v, 16));
 }
@@ -274,10 +266,6 @@ const parseLTVItem = (type, len, value) => {
 		case BT_DataType.BT_DATA_UUID32_ALL:
 		item.value = bufToValueArray(value, 4);
 		break;
-		case BT_DataType.BT_DATA_PUB_TARGET_ADDR:
-		case BT_DataType.BT_DATA_RAND_TARGET_ADDR:
-		item.value = bufToAddressString(value);
-		break;
 		case BT_DataType.BT_DATA_RSSI:
 		case BT_DataType.BT_DATA_ERROR_CODE:
 		item.value = bufToInt(value, true);
@@ -302,6 +290,14 @@ const parseLTVItem = (type, len, value) => {
 	}
 
 	return item;
+}
+
+export const bufToAddressString = (data) => {
+	if (data.length != 6) {
+		return `UNKNOWN ADDRESS`
+	}
+
+	return Array.from(data, b => b.toString(16).padStart(2, '0')).reverse().join(':').toUpperCase();
 }
 
 /**

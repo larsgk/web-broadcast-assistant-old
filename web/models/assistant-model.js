@@ -8,6 +8,7 @@ import {
 	tvArrayToLtv,
 	tvArrayFindItem
 } from '../lib/message.js';
+import { compareTypedArray } from '../lib/helpers.js';
 
 /**
 * Assistant Model
@@ -86,8 +87,8 @@ export class AssistantModel extends EventTarget {
 		// console.log('Payload', payloadArray);
 
 		const addr = tvArrayFindItem(payloadArray, [
-			BT_DataType.BT_DATA_PUB_TARGET_ADDR,
-			BT_DataType.BT_DATA_RAND_TARGET_ADDR
+			BT_DataType.BT_DATA_IDENTITY,
+			BT_DataType.BT_DATA_RPA
 		]);
 
 		if (!addr) {
@@ -102,7 +103,7 @@ export class AssistantModel extends EventTarget {
 		// TODO: Handle Broadcast ID parsing in message.js and attach to 'source'
 
 		// If device already exists, just update RSSI, otherwise add to list
-		let source = this.#sources.find(i => i.addr.value === addr.value);
+		let source = this.#sources.find(i => compareTypedArray(i.addr.value.addr, addr.value.addr));
 		if (!source) {
 			source = {
 				addr,
@@ -139,8 +140,8 @@ export class AssistantModel extends EventTarget {
 		const payloadArray = ltvToTvArray(message.payload);
 
 		const sink_addr = tvArrayFindItem(payloadArray, [
-			BT_DataType.BT_DATA_PUB_TARGET_ADDR,
-			BT_DataType.BT_DATA_RAND_TARGET_ADDR
+			BT_DataType.BT_DATA_IDENTITY,
+			BT_DataType.BT_DATA_RPA
 		]);
 
 		if (!sink_addr) {
@@ -157,7 +158,7 @@ export class AssistantModel extends EventTarget {
 		])?.value
 
 		// If device already exists, just update RSSI, otherwise add to list
-		let sink = this.#sinks.find(i => i.addr.value === sink_addr.value);
+		let sink = this.#sinks.find(i => compareTypedArray(i.addr.value.addr, sink_addr.value.addr));
 		if (!sink) {
 			console.warn("BIS Sync w/ unknown sink addr:", sink_addr);
 			return;
@@ -187,8 +188,8 @@ export class AssistantModel extends EventTarget {
 		// console.log('Payload', payloadArray);
 
 		const addr = tvArrayFindItem(payloadArray, [
-			BT_DataType.BT_DATA_PUB_TARGET_ADDR,
-			BT_DataType.BT_DATA_RAND_TARGET_ADDR
+			BT_DataType.BT_DATA_IDENTITY,
+			BT_DataType.BT_DATA_RPA
 		]);
 
 		if (!addr) {
@@ -201,7 +202,7 @@ export class AssistantModel extends EventTarget {
 		])?.value;
 
 		// If device already exists, just update RSSI, otherwise add to list
-		let sink = this.#sinks.find(i => i.addr.value === addr.value);
+		let sink = this.#sinks.find(i => compareTypedArray(i.addr.value.addr, addr.value.addr));
 		if (!sink) {
 			sink = {
 				addr,
@@ -228,12 +229,10 @@ export class AssistantModel extends EventTarget {
 		console.log(`Handle connected/disconnected Sink`);
 
 		const payloadArray = ltvToTvArray(message.payload);
-
 		const addr = tvArrayFindItem(payloadArray, [
-			BT_DataType.BT_DATA_PUB_TARGET_ADDR,
-			BT_DataType.BT_DATA_RAND_TARGET_ADDR
+			BT_DataType.BT_DATA_IDENTITY,
+			BT_DataType.BT_DATA_RPA
 		]);
-
 		if (!addr) {
 			// TBD: Throw exception?
 			return;
@@ -244,9 +243,9 @@ export class AssistantModel extends EventTarget {
 		])?.value;
 
 		// If device already exists, just update RSSI, otherwise add to list
-		let sink = this.#sinks.find(i => i.addr.value === addr.value);
+		let sink = this.#sinks.find(i => compareTypedArray(i.addr.value.addr, addr.value.addr));
 		if (!sink) {
-			console.warn("Unknown sink connected with addr:", addr);
+			console.warn("Unknown sink connected with addr:", addr.value.addr);
 		} else {
 			if (err !== 0) {
 				console.log("Error code", err);
