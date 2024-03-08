@@ -291,7 +291,7 @@ export class AssistantModel extends EventTarget {
 		if (!sink) {
 			console.warn("Unknown sink had its identity resolved:", addrRPA.value.addr);
 		} else {
-			sink.addr.value.addr = addrIdentity.value.addr;
+			sink.addr = addrIdentity;
 			this.dispatchEvent(new CustomEvent('sink-updated', {detail: { sink }}));
 		}
 	}
