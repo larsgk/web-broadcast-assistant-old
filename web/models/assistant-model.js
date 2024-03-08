@@ -262,6 +262,40 @@ export class AssistantModel extends EventTarget {
 		}
 	}
 
+	handleIdentityResolved(message) {
+		console.log("Handle Identity Resolved");
+		console.log(message);
+
+		const payloadArray = ltvToTvArray(message.payload);
+		console.log(payloadArray);
+
+		const addrIdentity = tvArrayFindItem(payloadArray, [
+			BT_DataType.BT_DATA_IDENTITY
+		]);
+		console.log(addrIdentity)
+		if (!addrIdentity) {
+			console.warn("No Identity Address found in Identity Resolved handling");
+			return;
+		}
+
+		const addrRPA = tvArrayFindItem(payloadArray, [
+			BT_DataType.BT_DATA_RPA
+		]);
+
+		if (!addrRPA) {
+			console.warn("No RPA Address found in Identity Resolved handling");
+			return;
+		}
+
+		let sink = this.#sinks.find(i => compareTypedArray(i.addr.value.addr, addrRPA.value.addr));
+		if (!sink) {
+			console.warn("Unknown sink had its identity resolved:", addrRPA.value.addr);
+		} else {
+			sink.addr.value.addr = addrIdentity.value.addr;
+			this.dispatchEvent(new CustomEvent('sink-updated', {detail: { sink }}));
+		}
+	}
+
 	handleRES(message) {
 		console.log(`Response message with subType 0x${message.subType.toString(16)}`);
 
@@ -341,6 +375,8 @@ export class AssistantModel extends EventTarget {
 			case MessageSubType.BIS_UNSYNCED:
 			this.handleBISSync(message, false);
 			break;
+			case MessageSubType.IDENTITY_RESOLVED:
+			this.handleIdentityResolved(message);
 			break;
 			default:
 			console.log(`Missing handler for EVT subType 0x${message.subType.toString(16)}`);
