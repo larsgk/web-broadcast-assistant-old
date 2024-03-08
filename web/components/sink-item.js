@@ -1,6 +1,6 @@
 // @ts-check
 
-import { BT_DataType } from '../lib/message.js';
+import { BT_DataType, bufToAddressString } from '../lib/message.js';
 
 /*
 * Sink Item Component
@@ -96,13 +96,15 @@ const addrString = (addr) => {
 		return "Unknown address";
 	}
 
-	const val = addr.value;
+	const val = bufToAddressString(addr.value.addr);
 
-	if (addr.type === BT_DataType.BT_DATA_RAND_TARGET_ADDR) {
-		return `${val} (random)`;
-	} else if (addr.type === BT_DataType.BT_DATA_PUB_TARGET_ADDR) {
-		return `${val} (public)`;
+	if (addr.type === BT_DataType.BT_DATA_RPA) {
+		return `${val} (Unresolved)`;
+	} else if (addr.type === BT_DataType.BT_DATA_IDENTITY) {
+		return `${val} (Resolved)`;
 	}
+
+	return "Unknown address type";
 }
 
 export class SinkItem extends HTMLElement {
